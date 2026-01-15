@@ -70,7 +70,8 @@ namespace protoc_gen_turbolink
             foreach (GrpcServiceFile serviceFile in collection.GrpcServiceFiles.Values)
             {
                 TurboLinkGenerator generator = new TurboLinkGenerator(serviceFile.ProtoFileDesc, serviceFile);
-                generator.BuildOutputFiles(generateServiceCode, generateJsonCode);
+                // generator.BuildOutputFiles(generateServiceCode, generateJsonCode);
+                generator.BuildOutputFilesNew(generateServiceCode, generateJsonCode);
 
                 foreach (GeneratedFile generatedFile in generator.GeneratedFiles)
                 {

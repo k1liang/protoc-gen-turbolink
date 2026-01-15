@@ -1,0 +1,2 @@
+dotnet publish protoc-gen-turbolink.csproj -c Release  -r win-x64   --self-contained true   -o publish/windows
+copy publish\windows\protoc-gen-turbolink.exe C:\Work\TongSim\tongtestue5\Plugins\TongosGrpc\GrpcLibraries\Win64 /Y

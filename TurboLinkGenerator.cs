@@ -29,6 +29,29 @@ namespace protoc_gen_turbolink
             ProtoFile = protoFile;
             ServiceFile = serviceFile;
         }
+
+        public void BuildOutputFilesNew(bool generateServiceCode, bool generateJsonCode)
+        {
+            GeneratedFile file;
+            string turboLinkBaseName = ServiceFile.TurboLinkBasicFileName;
+
+            GenerateParam generateParam;
+            generateParam.GenerateServiceCode = generateServiceCode;
+            generateParam.GenerateJsonCode = generateJsonCode;
+            
+            // xxxMessage.h
+            Template.MessageH messageHTemplate = new Template.MessageH(ServiceFile, generateParam);
+            file.FileName = string.Join("/", "Public", turboLinkBaseName + "Message.h");
+            file.Content = messageHTemplate.TransformText();
+            GeneratedFiles.Add(file);
+
+            // xxxMessage.cpp
+            Template.MessageCPP messageCPPTemplate = new Template.MessageCPP(ServiceFile, generateParam);
+            file.FileName = string.Join("/", "Private", turboLinkBaseName + "Message.cpp");
+            file.Content = messageCPPTemplate.TransformText();
+            GeneratedFiles.Add(file);            
+        }
+
         public void BuildOutputFiles(bool generateServiceCode, bool generateJsonCode)
         {
             GeneratedFile file;
