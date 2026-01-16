@@ -76,6 +76,7 @@ namespace protoc_gen_turbolink.Template
             writer.Indent++;
             writer.WriteLine("GENERATED_BODY()");
             
+            writer.Indent--;
             writer.WriteLine("public:");
             writer.Indent++;
             writer.WriteLine("UPROPERTY()");

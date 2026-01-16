@@ -44,7 +44,7 @@ namespace protoc_gen_turbolink.Template
                 GenerateStructs(writer);
 
                 // 渲染 Helper Libraries
-                // GenerateHelpers(writer);
+                GenerateHelpers(writer);
 
                 return sw.ToString();
             }
@@ -106,13 +106,13 @@ namespace protoc_gen_turbolink.Template
 
                 foreach (var field in message.Fields)
                 {
+                    writer.WriteLine();
                     if (field.NeedNativeMake)
                     {
                         writer.WriteLine($"{field.TypeAsNativeField} {field.FieldName};");
                     }
                     else
                     {
-                        writer.WriteLine();
                         writer.WriteLine("UPROPERTY(BlueprintReadWrite, Category = TurboLink)");
                         writer.WriteLine($"{field.FieldType} {field.FieldName}{field.FieldDefaultValue};");
                     }
@@ -137,7 +137,10 @@ namespace protoc_gen_turbolink.Template
                 writer.WriteLine("{");
                 writer.Indent++;
                 writer.WriteLine("GENERATED_BODY()");
+                
+                writer.Indent--;
                 writer.WriteLine("public:");
+                writer.Indent++;
                 
                 // --- 1. Make 函数 ---
                 writer.WriteLine("UFUNCTION(BlueprintPure, Category = \"TurboLink|" + s.CamelPackageName + "\", meta=(BlueprintThreadSafe))");

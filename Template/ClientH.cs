@@ -54,7 +54,9 @@ namespace protoc_gen_turbolink.Template
                     writer.WriteLine();
 
                     // 2.3 生成属性 (Properties / Delegates Instances)
+                    writer.Indent--;
                     writer.WriteLine("public:");
+                    writer.Indent++;
                     foreach (var method in service.MethodArray)
                     {
                         if (method.ClientStreaming)
@@ -69,7 +71,9 @@ namespace protoc_gen_turbolink.Template
                     }
 
                     // 2.4 生成函数声明 (UFUNCTIONS)
+                    writer.Indent--;
                     writer.WriteLine("public:");
+                    writer.Indent++;
                     foreach (var method in service.MethodArray)
                     {
                         writer.WriteLine("UFUNCTION(BlueprintCallable, Category = TurboLink)");
@@ -89,7 +93,9 @@ namespace protoc_gen_turbolink.Template
                     }
 
                     // 2.5 生成公共成员函数
+                    writer.Indent--;
                     writer.WriteLine("public:");
+                    writer.Indent++;
                     writer.WriteLine("virtual void Shutdown() override;");
                     writer.WriteLine();
                     writer.WriteLine("UFUNCTION(BlueprintCallable, Category = TurboLink)");

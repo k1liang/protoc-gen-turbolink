@@ -48,6 +48,7 @@ namespace protoc_gen_turbolink.Template
                         writer.WriteLine();
 
                         // 6. Private 成员函数
+                        writer.Indent--;
                         writer.WriteLine("private:");
                         writer.Indent++;
 

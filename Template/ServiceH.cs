@@ -46,6 +46,7 @@ namespace protoc_gen_turbolink.Template
                     writer.WriteLine("GENERATED_BODY()");
 
                     // 3. 公有基础接口
+                    writer.Indent--;
                     writer.WriteLine("public:");
                     writer.Indent++;
                     writer.WriteLine("UFUNCTION(BlueprintCallable, Category = TurboLink)");
