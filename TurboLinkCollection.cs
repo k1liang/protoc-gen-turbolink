@@ -20,6 +20,7 @@ namespace protoc_gen_turbolink
 	{
 		public string Name { get; set; }                //eg. "EGrpcCommonGender"
 		public string DisplayName { get; set; }         //eg. "Common.Gender"
+		public string OriginalDisplayName { get; set; }         //eg. "Common.Gender"
 		public List<GrpcEnumField> Fields { get; set; }
 		public bool MissingZeroField = false;
 	}
@@ -171,9 +172,16 @@ namespace protoc_gen_turbolink
 				TurboLinkUtils.JoinCamelString(ParentMessageNameList, ".") +
 				CamelName;
 		}
+
+		public virtual string OriginalDisplayName
+		{
+			get => ServiceFile.PackageOriginalName + "." +
+			       string.Join(".", ParentMessageNameList) + 
+			       MessageDesc.Name;
+		}
 		public string[] ParentMessageNameList;
 		public List<GrpcMessageField> Fields { get; set; }
-		public bool HasNativeMake { get; set; }
+		public bool HasNativeMake { get; set; }		
 	}
 	public class GrpcMessage_Oneof : GrpcMessage
 	{
@@ -201,6 +209,11 @@ namespace protoc_gen_turbolink
 		public override string DisplayName						//eg. "GoogleProtobuf.Value.Kind"
 		{
 			get => ParentMessage.DisplayName + "." + CamelName;
+		}
+
+		public override string OriginalDisplayName
+		{
+			get => ParentMessage.OriginalDisplayName + "." + OneofDesc.Name;
 		}
 	}
 	public class GrpcServiceMethod
@@ -277,6 +290,10 @@ namespace protoc_gen_turbolink
 		public string CamelPackageName                      //eg. "Greeter", "GoogleProtobuf"
 		{
 			get => string.Join(string.Empty, TurboLinkUtils.MakeCamelStringArray(PackageNameAsList));
+		}
+		public string PackageOriginalName
+		{
+			get => string.Join(".", PackageNameAsList);
 		}
 		public string GrpcPackageName                       //eg. "Greeter", "google::protobuf"
 		{
@@ -497,6 +514,7 @@ namespace protoc_gen_turbolink
 					//add oneof enum
 					oneofEnum.Name = "EGrpc" + oneofMessage.Name.Substring(5);
 					oneofEnum.DisplayName = oneofMessage.DisplayName;
+					oneofEnum.OriginalDisplayName =  oneofMessage.OriginalDisplayName;
 					oneofEnum.Fields = new List<GrpcEnumField>();
 					serviceFile.EnumArray.Add(oneofEnum);
 				}
@@ -577,6 +595,7 @@ namespace protoc_gen_turbolink
 			var serviceFile = GrpcServiceFiles[protoFileName];
 
 			//find message index that each field directly depends on
+			List<KeyValuePair<int, GrpcMessage>> insertList = new List<KeyValuePair<int, GrpcMessage>>(); //Item1=insert pos, Item2=message
 			foreach(GrpcMessage message in serviceFile.MessageArray)
 			{
 				foreach(GrpcMessageField messageField in message.Fields)
@@ -593,13 +612,25 @@ namespace protoc_gen_turbolink
 					}
 					if (serviceFile.Message2IndexMap.ContainsKey(typeName))
 					{
-						if(serviceFile.Message2IndexMap[typeName] >= message.Index)
+						int index = serviceFile.Message2IndexMap[typeName];
+						if(index >= message.Index)
 						{
-							messageField.NeedNativeMake = true;
-							message.HasNativeMake = true;
+							// 记录插入位置和消息，以便后续处理
+							insertList.Add(new KeyValuePair<int, GrpcMessage>(message.Index, serviceFile.MessageArray[index]));
+							
+							// messageField.NeedNativeMake = true;
+							// message.HasNativeMake = true;							
 						}
 					}
 				}
+			}
+
+			// insert dependent message before current message
+			for(int i=insertList.Count-1; i>=0; i--)
+			{
+				var pair = insertList[i];
+				serviceFile.MessageArray.Remove(pair.Value);
+				serviceFile.MessageArray.Insert(pair.Key, pair.Value);				
 			}
 		}
 	}

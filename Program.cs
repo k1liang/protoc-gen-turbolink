@@ -35,8 +35,9 @@ namespace protoc_gen_turbolink
             //read request param
             bool dumpRequest = false;
             bool dumpCollection = false;
-            bool generateServiceCode = true;
+            bool generateServiceCode = false;
             bool generateJsonCode = false;
+            bool generateBPHelper = false;
 
             if (request.HasParameter)
 			{
@@ -45,10 +46,11 @@ namespace protoc_gen_turbolink
                     .GroupBy(param => param.Split('=')[0].Trim(), param => param.Split('=')[1].Trim())
                     .ToDictionary(x => x.Key, x => x.First());
 
-                dumpRequest = GetParam(paramDictionary, "DumpRequest", false);
-                dumpCollection = GetParam(paramDictionary, "DumpCollection", false);
-                generateServiceCode = GetParam(paramDictionary, "GenerateServiceCode", true);
-                generateJsonCode = GetParam(paramDictionary, "GenerateJsonCode", false);
+                dumpRequest = GetParam(paramDictionary, "DumpRequest", dumpRequest);
+                dumpCollection = GetParam(paramDictionary, "DumpCollection", dumpCollection);
+                generateServiceCode = GetParam(paramDictionary, "GenerateServiceCode", generateServiceCode);
+                generateJsonCode = GetParam(paramDictionary, "GenerateJsonCode", generateJsonCode);
+                generateBPHelper = GetParam(paramDictionary, "GenerateBPHelper", generateBPHelper);
             }
 
             //create code generator reponse
@@ -70,8 +72,7 @@ namespace protoc_gen_turbolink
             foreach (GrpcServiceFile serviceFile in collection.GrpcServiceFiles.Values)
             {
                 TurboLinkGenerator generator = new TurboLinkGenerator(serviceFile.ProtoFileDesc, serviceFile);
-                generator.BuildOutputFiles(generateServiceCode, generateJsonCode);
-                // generator.BuildOutputFilesNew(generateServiceCode, generateJsonCode);
+                generator.BuildOutputFiles(generateServiceCode, generateJsonCode, generateBPHelper);                
 
                 foreach (GeneratedFile generatedFile in generator.GeneratedFiles)
                 {

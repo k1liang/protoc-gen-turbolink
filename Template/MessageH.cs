@@ -31,7 +31,7 @@ namespace protoc_gen_turbolink.Template
 
                 if (s.EnumArray.Count > 0 || s.MessageArray.Count > 0)
                 {
-                    if (s.NeedBlueprintFunctionLibrary())
+                    if (g.GenerateBPHelper && s.NeedBlueprintFunctionLibrary())
                         writer.WriteLine("#include \"Kismet/BlueprintFunctionLibrary.h\"");
                     
                     writer.WriteLine($"#include \"{s.CamelFileName}Message.generated.h\"");
@@ -44,7 +44,10 @@ namespace protoc_gen_turbolink.Template
                 GenerateStructs(writer);
 
                 // 渲染 Helper Libraries
-                GenerateHelpers(writer);
+                if (g.GenerateBPHelper)
+                {
+                    GenerateHelpers(writer);
+                }
 
                 return sw.ToString();
             }
@@ -76,9 +79,10 @@ namespace protoc_gen_turbolink.Template
             foreach (var message in s.MessageArray)
             {
                 writer.WriteLine();
-                if (message.HasNativeMake || message is GrpcMessage_Oneof)
+                if (g.GenerateBPHelper && (message.HasNativeMake || message is GrpcMessage_Oneof))
                 {
-                    writer.WriteLine($"USTRUCT(BlueprintType, meta = (DisplayName=\"{message.DisplayName}\",");
+                    // writer.WriteLine($"USTRUCT(BlueprintType, meta = (DisplayName=\"{message.DisplayName}\",");
+                    writer.WriteLine($"USTRUCT(BlueprintType, meta = (DisplayName=\"{message.OriginalDisplayName}\",");
                     writer.Indent++;
                     writer.WriteLine($"HasNativeMake = \"/Script/TurboLinkGrpc.{message.Name.Substring(1)}HelperLibrary.Make{message.CamelName}\",");
                     writer.WriteLine($"HasNativeBreak = \"/Script/TurboLinkGrpc.{message.Name.Substring(1)}HelperLibrary.Break{message.CamelName}\"))");
@@ -86,7 +90,8 @@ namespace protoc_gen_turbolink.Template
                 }
                 else
                 {
-                    writer.WriteLine($"USTRUCT(BlueprintType, meta = (DisplayName=\"{message.DisplayName}\"))");
+                    // writer.WriteLine($"USTRUCT(BlueprintType, meta = (DisplayName=\"{message.DisplayName}\"))");
+                    writer.WriteLine($"USTRUCT(BlueprintType, meta = (DisplayName=\"{message.OriginalDisplayName}\"))");
                 }
 
                 writer.WriteLine($"struct {message.Name} : public FGrpcMessage");

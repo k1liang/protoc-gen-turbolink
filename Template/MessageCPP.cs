@@ -39,12 +39,15 @@ namespace protoc_gen_turbolink.Template
                 }
 
                 // 2. 遍历消息生成 HelperLibrary 实现
-                foreach (var message in s.MessageArray)
+                if (g.GenerateBPHelper)
                 {
-                    if (message.HasNativeMake || message is GrpcMessage_Oneof)
+                    foreach (var message in s.MessageArray)
                     {
-                        GenerateMakeFunction(writer, message);
-                        GenerateBreakFunction(writer, message);
+                        if (message.HasNativeMake || message is GrpcMessage_Oneof)
+                        {
+                            GenerateMakeFunction(writer, message);
+                            GenerateBreakFunction(writer, message);
+                        }
                     }
                 }
 
