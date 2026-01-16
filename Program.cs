@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,7 +13,7 @@ namespace protoc_gen_turbolink
 {
     class Program
     {
-        static bool GetParam(Dictionary<string, string> paramDictionary, string paramName, bool defaultValue)
+        static bool GetBoolParam(Dictionary<string, string> paramDictionary, string paramName, bool defaultValue)
 		{
             if (!paramDictionary.ContainsKey(paramName))
             {
@@ -25,6 +26,15 @@ namespace protoc_gen_turbolink
             }
             return paramValue == "true" ? true : false;
         }
+        static string GetStringParam(Dictionary<string, string> paramDictionary, string paramName, string defaultValue)
+        {
+            if (!paramDictionary.ContainsKey(paramName))
+            {
+                return defaultValue;
+            }
+            return paramDictionary[paramName];
+        }
+        
         static void Main(string[] args)
         {
             //read code generator request from stdin.
@@ -36,8 +46,16 @@ namespace protoc_gen_turbolink
             bool dumpRequest = false;
             bool dumpCollection = false;
             bool generateServiceCode = false;
-            bool generateJsonCode = false;
+            bool generateJsonCode = true;
             bool generateBPHelper = false;
+            string removeOutputSubDir = "";
+            
+            GenerateParam generateParam;
+            generateParam.GenerateServiceCode = false;
+            generateParam.GenerateDefaultFunctionCode = false;
+            generateParam.GenerateBPHelper = false;
+            generateParam.SingleOutputFile = true;
+            generateParam.ExportPrefix = "";
 
             if (request.HasParameter)
 			{
@@ -46,11 +64,14 @@ namespace protoc_gen_turbolink
                     .GroupBy(param => param.Split('=')[0].Trim(), param => param.Split('=')[1].Trim())
                     .ToDictionary(x => x.Key, x => x.First());
 
-                dumpRequest = GetParam(paramDictionary, "DumpRequest", dumpRequest);
-                dumpCollection = GetParam(paramDictionary, "DumpCollection", dumpCollection);
-                generateServiceCode = GetParam(paramDictionary, "GenerateServiceCode", generateServiceCode);
-                generateJsonCode = GetParam(paramDictionary, "GenerateJsonCode", generateJsonCode);
-                generateBPHelper = GetParam(paramDictionary, "GenerateBPHelper", generateBPHelper);
+                dumpRequest = GetBoolParam(paramDictionary, "DumpRequest", dumpRequest);
+                dumpCollection = GetBoolParam(paramDictionary, "DumpCollection", dumpCollection);
+                generateParam.GenerateServiceCode = GetBoolParam(paramDictionary, "GenerateServiceCode", generateParam.GenerateServiceCode);
+                generateParam.GenerateDefaultFunctionCode = GetBoolParam(paramDictionary, "GenerateDefaultFunctionCode", generateParam.GenerateDefaultFunctionCode);
+                generateParam.GenerateBPHelper = GetBoolParam(paramDictionary, "GenerateBPHelper", generateParam.GenerateBPHelper);
+                generateParam.SingleOutputFile = GetBoolParam(paramDictionary, "SingleOutputFile", generateParam.SingleOutputFile);
+                generateParam.ExportPrefix = GetStringParam(paramDictionary, "ExportPrefix", generateParam.ExportPrefix);
+                removeOutputSubDir = GetStringParam(paramDictionary, "RemoveOutputSubDir", removeOutputSubDir);
             }
 
             //create code generator reponse
@@ -68,16 +89,17 @@ namespace protoc_gen_turbolink
                 WriteResponse(response);
                 return;
             }
-
+            
+            TurboLinkGenerator.UsedFileNames.Clear();
             foreach (GrpcServiceFile serviceFile in collection.GrpcServiceFiles.Values)
             {
                 TurboLinkGenerator generator = new TurboLinkGenerator(serviceFile.ProtoFileDesc, serviceFile);
-                generator.BuildOutputFiles(generateServiceCode, generateJsonCode, generateBPHelper);                
+                generator.BuildOutputFiles(generateParam, removeOutputSubDir);
 
                 foreach (GeneratedFile generatedFile in generator.GeneratedFiles)
                 {
                     CodeGeneratorResponse.Types.File newFile = new CodeGeneratorResponse.Types.File();
-
+                    
                     newFile.Name = generatedFile.FileName;
                     newFile.Content = generatedFile.Content;
                     response.File.Add(newFile);

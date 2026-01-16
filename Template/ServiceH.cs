@@ -40,7 +40,7 @@ namespace protoc_gen_turbolink.Template
                     string clientClassName = $"U{service.Name}Client";
 
                     writer.WriteLine("UCLASS(ClassGroup = TurboLink, BlueprintType)");
-                    writer.WriteLine($"class TURBOLINKGRPC_API {className} : public UGrpcService");
+                    writer.WriteLine($"class {g.ExportPrefix} {className} : public UGrpcService");
                     writer.WriteLine("{");
                     writer.Indent++;
                     writer.WriteLine("GENERATED_BODY()");

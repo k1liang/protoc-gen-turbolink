@@ -38,7 +38,7 @@ namespace protoc_gen_turbolink.Template
                         string contextClassName = $"GrpcContext_{service.Name}_{method.Name}";
 
                         // 4. 类定义开始
-                        writer.WriteLine($"class {contextClassName} : public {superClass}");
+                        writer.WriteLine($"class {g.ExportPrefix} {contextClassName} : public {superClass}");
                         writer.WriteLine("{");
                         writer.Indent++;
 

@@ -71,7 +71,7 @@ namespace protoc_gen_turbolink.Template
             string className = $"U{service.Name}{method.Name}LambdaWrapper";
 
             writer.WriteLine("UCLASS()");
-            writer.WriteLine($"class {className} : public UObject");
+            writer.WriteLine($"class {g.ExportPrefix} {className} : public UObject");
             writer.WriteLine("{");
             writer.Indent++;
             writer.WriteLine("GENERATED_BODY()");

@@ -67,7 +67,7 @@ namespace protoc_gen_turbolink.Template
 
             writer.WriteLine();
             writer.WriteLine("UCLASS(ClassGroup = TurboLink)");
-            writer.WriteLine($"class TURBOLINKGRPC_API {nodeClassName} : public UBlueprintAsyncActionBase");
+            writer.WriteLine($"class {g.ExportPrefix} {nodeClassName} : public UBlueprintAsyncActionBase");
             writer.WriteLine("{");
             writer.Indent++;
             writer.WriteLine("GENERATED_BODY()");

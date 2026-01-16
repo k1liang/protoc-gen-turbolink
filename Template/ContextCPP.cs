@@ -25,9 +25,9 @@ namespace protoc_gen_turbolink.Template
                 writer.WriteLine($"#include \"{s.CamelFileName}Service_Private.h\"");
                 writer.WriteLine($"#include \"{s.CamelFileName}Marshaling.h\"");
 
-                foreach (string dependency in s.DependencyFiles)
+                foreach (var dependency in s.DependencyFiles)
                 {
-                    writer.WriteLine($"#include \"{dependency}Marshaling.h\"");
+                    writer.WriteLine($"#include \"{dependency.TurboLinkBasicFileName}Marshaling.h\"");
                 }
                 writer.WriteLine("#include \"TurboLinkGrpcManager.h\"");
 

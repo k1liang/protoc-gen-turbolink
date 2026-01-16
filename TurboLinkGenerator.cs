@@ -1,4 +1,5 @@
 ﻿using System;
+using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,135 +13,275 @@ namespace protoc_gen_turbolink
     {
         public string FileName;
         public string Content;
+        public GrpcServiceFile  ServiceFile;
     }
     public struct GenerateParam
-	{
-        public bool GenerateServiceCode;
-        public bool GenerateJsonCode;
-        public bool GenerateBPHelper;
-    }
-    public class TurboLinkGenerator
     {
-        public FileDescriptorProto ProtoFile;
-        GrpcServiceFile ServiceFile;
+        public bool GenerateServiceCode;
+        public bool GenerateDefaultFunctionCode;
+        public bool GenerateBPHelper;
+        public bool SingleOutputFile;
+        public string ExportPrefix;
+    }
+    public class TurboLinkGenerator(FileDescriptorProto protoFile, GrpcServiceFile serviceFile)
+    {
+        public FileDescriptorProto ProtoFile = protoFile;
 
         public List<GeneratedFile> GeneratedFiles = new List<GeneratedFile>();
-        public TurboLinkGenerator(FileDescriptorProto protoFile, GrpcServiceFile serviceFile)
-        {
-            ProtoFile = protoFile;
-            ServiceFile = serviceFile;
-        }
 
-        public void BuildOutputFiles(bool generateServiceCode, bool generateJsonCode, bool GenerateHelper)
+        public static Dictionary<GrpcServiceFile, string> UsedFileNames = new Dictionary<GrpcServiceFile, string>();
+
+        public void BuildOutputFiles(GenerateParam generateParam, string removeOutputSubDir)
         {
             GeneratedFile file;
-            string turboLinkBaseName = ServiceFile.TurboLinkBasicFileName;
-
-            GenerateParam generateParam;
-            generateParam.GenerateServiceCode = generateServiceCode;
-            generateParam.GenerateJsonCode = generateJsonCode;
-            generateParam.GenerateBPHelper = GenerateHelper;
-
-            // xxxMarshaling.h
-            Template.MarshalingH marshalingHTemplate = new Template.MarshalingH(ServiceFile, generateParam);
-            file = new GeneratedFile();
-            file.FileName = string.Join("/", "Private", turboLinkBaseName + "Marshaling.h");
-            file.Content = marshalingHTemplate.TransformText();
-            GeneratedFiles.Add(file);
-
-            // xxxMarshaling.cpp
-            Template.MarshalingCPP marshalingCPPTemplate = new Template.MarshalingCPP(ServiceFile, generateParam);
-            file = new GeneratedFile();
-            file.FileName = string.Join("/", "Private", turboLinkBaseName + "Marshaling.cpp");
-            file.Content = marshalingCPPTemplate.TransformText();
-            GeneratedFiles.Add(file);
+            // string turboLinkBaseName = ServiceFile.TurboLinkBasicFileName;
+            string turboLinkBaseName = serviceFile.PackageOriginalName.Replace('.', '/') + "/";
+            if (removeOutputSubDir.Length > 0 && turboLinkBaseName.StartsWith(removeOutputSubDir))
+            {
+                turboLinkBaseName = turboLinkBaseName.Replace(removeOutputSubDir, "");
+            }
 
             // xxxMessage.h
-            Template.MessageH messageHTemplate = new Template.MessageH(ServiceFile, generateParam);
-            file.FileName = string.Join("/", "Public", turboLinkBaseName + "Message.h");
+            Template.MessageH messageHTemplate = new Template.MessageH(serviceFile, generateParam);
+            file = new GeneratedFile();
+            file.FileName = string.Join("/", turboLinkBaseName + "Message.h");
             file.Content = messageHTemplate.TransformText();
+            file.ServiceFile =  serviceFile;
             GeneratedFiles.Add(file);
 
             // xxxMessage.cpp
-            Template.MessageCPP messageCPPTemplate = new Template.MessageCPP(ServiceFile, generateParam);
-            file.FileName = string.Join("/", "Private", turboLinkBaseName + "Message.cpp");
+            Template.MessageCPP messageCPPTemplate = new Template.MessageCPP(serviceFile, generateParam);
+            file = new GeneratedFile();
+            file.FileName = string.Join("/", turboLinkBaseName + "Message.cpp");
             file.Content = messageCPPTemplate.TransformText();
+            file.ServiceFile =  serviceFile;
+            GeneratedFiles.Add(file);
+            
+            // xxxMarshaling.h
+            Template.MarshalingH marshalingHTemplate = new Template.MarshalingH(serviceFile, generateParam);
+            file = new GeneratedFile();
+            file.FileName = string.Join("/", turboLinkBaseName + "Marshaling.h");
+            file.Content = marshalingHTemplate.TransformText();
+            file.ServiceFile =  serviceFile;
+            GeneratedFiles.Add(file);
+
+            // xxxMarshaling.cpp
+            Template.MarshalingCPP marshalingCPPTemplate = new Template.MarshalingCPP(serviceFile, generateParam);
+            file = new GeneratedFile();
+            file.FileName = string.Join("/", turboLinkBaseName + "Marshaling.cpp");
+            file.Content = marshalingCPPTemplate.TransformText();
+            file.ServiceFile =  serviceFile;
             GeneratedFiles.Add(file);
 
             if (ProtoFile.Service.Count > 0 && generateParam.GenerateServiceCode)
             {
                 // xxxService.h
-                Template.ServiceH serviceHTemplate = new Template.ServiceH(ServiceFile, generateParam);
+                Template.ServiceH serviceHTemplate = new Template.ServiceH(serviceFile, generateParam);
                 file = new GeneratedFile();
-                file.FileName = string.Join("/", "Public", turboLinkBaseName + "Service.h");
+                file.FileName = string.Join("/", turboLinkBaseName + "Service.h");
                 file.Content = serviceHTemplate.TransformText();
+                file.ServiceFile =  serviceFile;
                 GeneratedFiles.Add(file);
 
                 // xxxClient.h
-                Template.ClientH clientHTemplate = new Template.ClientH(ServiceFile, generateParam);
+                Template.ClientH clientHTemplate = new Template.ClientH(serviceFile, generateParam);
                 file = new GeneratedFile();
-                file.FileName = string.Join("/", "Public", turboLinkBaseName + "Client.h");
+                file.FileName = string.Join("/", turboLinkBaseName + "Client.h");
                 file.Content = clientHTemplate.TransformText();
+                file.ServiceFile =  serviceFile;
                 GeneratedFiles.Add(file);
 
                 // xxxClient.cpp
-                Template.ClientCPP clientCPPTemplate = new Template.ClientCPP(ServiceFile, generateParam);
+                Template.ClientCPP clientCPPTemplate = new Template.ClientCPP(serviceFile, generateParam);
                 file = new GeneratedFile();
-                file.FileName = string.Join("/", "Private", turboLinkBaseName + "Client.cpp");
+                file.FileName = string.Join("/", turboLinkBaseName + "Client.cpp");
                 file.Content = clientCPPTemplate.TransformText();
+                file.ServiceFile =  serviceFile;
                 GeneratedFiles.Add(file);
 
                 // xxxServicePrivate.h
-                Template.ServicePrivateH servicePrivateHTemplate = new Template.ServicePrivateH(ServiceFile, generateParam);
+                Template.ServicePrivateH servicePrivateHTemplate = new Template.ServicePrivateH(serviceFile, generateParam);
                 file = new GeneratedFile();
-                file.FileName = string.Join("/", "Private", turboLinkBaseName + "Service_Private.h");
+                file.FileName = string.Join("/", turboLinkBaseName + "Service_Private.h");
                 file.Content = servicePrivateHTemplate.TransformText();
+                file.ServiceFile =  serviceFile;
                 GeneratedFiles.Add(file);
 
                 // xxxServicePrivate.cpp
-                Template.ServicePrivateCPP servicePrivateCPPTemplate = new Template.ServicePrivateCPP(ServiceFile, generateParam);
+                Template.ServicePrivateCPP servicePrivateCPPTemplate = new Template.ServicePrivateCPP(serviceFile, generateParam);
                 file = new GeneratedFile();
-                file.FileName = string.Join("/", "Private", turboLinkBaseName + "Service_Private.cpp");
+                file.FileName = string.Join("/", turboLinkBaseName + "Service_Private.cpp");
                 file.Content = servicePrivateCPPTemplate.TransformText();
+                file.ServiceFile =  serviceFile;
                 GeneratedFiles.Add(file);
 
                 // xxxContext.h
-                Template.ContextH contextHTemplate = new Template.ContextH(ServiceFile, generateParam);
+                Template.ContextH contextHTemplate = new Template.ContextH(serviceFile, generateParam);
                 file = new GeneratedFile();
-                file.FileName = string.Join("/", "Private", turboLinkBaseName + "Context.h");
+                file.FileName = string.Join("/", turboLinkBaseName + "Context.h");
                 file.Content = contextHTemplate.TransformText();
+                file.ServiceFile =  serviceFile;
                 GeneratedFiles.Add(file);
 
                 // xxxContext.cpp
-                Template.ContextCPP contextCPPTemplate = new Template.ContextCPP(ServiceFile, generateParam);
+                Template.ContextCPP contextCPPTemplate = new Template.ContextCPP(serviceFile, generateParam);
                 file = new GeneratedFile();
-                file.FileName = string.Join("/", "Private", turboLinkBaseName + "Context.cpp");
+                file.FileName = string.Join("/", turboLinkBaseName + "Context.cpp");
                 file.Content = contextCPPTemplate.TransformText();
+                file.ServiceFile =  serviceFile;
                 GeneratedFiles.Add(file);
 
                 // xxxService.cpp
-                Template.ServiceCPP serviceCPPTemplate = new Template.ServiceCPP(ServiceFile, generateParam);
+                Template.ServiceCPP serviceCPPTemplate = new Template.ServiceCPP(serviceFile, generateParam);
                 file = new GeneratedFile();
-                file.FileName = string.Join("/", "Private", turboLinkBaseName + "Service.cpp");
+                file.FileName = string.Join("/", turboLinkBaseName + "Service.cpp");
                 file.Content = serviceCPPTemplate.TransformText();
+                file.ServiceFile =  serviceFile;
                 GeneratedFiles.Add(file);
 
                 // xxxNode.h
-                if (ServiceFile.GetTotalPingPongMethodCounts() > 0)
+                if (serviceFile.GetTotalPingPongMethodCounts() > 0)
                 {
-                    Template.NodeH nodeHTemplate = new Template.NodeH(ServiceFile, generateParam);
+                    Template.NodeH nodeHTemplate = new Template.NodeH(serviceFile, generateParam);
                     file = new GeneratedFile();
-                    file.FileName = string.Join("/", "Public", turboLinkBaseName + "Node.h");
+                    file.FileName = string.Join("/", turboLinkBaseName + "Node.h");
                     file.Content = nodeHTemplate.TransformText();
+                    file.ServiceFile =  serviceFile;
                     GeneratedFiles.Add(file);
 
                     // xxxNode.cpp
-                    Template.NodeCPP nodeCPPTemplate = new Template.NodeCPP(ServiceFile, generateParam);
+                    Template.NodeCPP nodeCPPTemplate = new Template.NodeCPP(serviceFile, generateParam);
                     file = new GeneratedFile();
-                    file.FileName = string.Join("/", "Private", turboLinkBaseName + "Node.cpp");
+                    file.FileName = string.Join("/", turboLinkBaseName + "Node.cpp");
                     file.Content = nodeCPPTemplate.TransformText();
+                    file.ServiceFile =  serviceFile;
                     GeneratedFiles.Add(file);
                 }
+            }
+
+            if (generateParam.SingleOutputFile)
+            {
+                MergeFile(turboLinkBaseName, serviceFile);
+            }
+        }
+
+        private string GetHeaderFileName(string name)
+        {
+            var filePrefix = "turbolink/generated/";
+            return Path.Join(filePrefix, name.Replace("bigai.ue.", "").Replace(".", "/"));
+        }
+
+        enum EVerifyAdditionalType
+        {
+            None = 0,
+            Header,
+            Cpp,
+        }
+
+        private string VerifyFileName(GrpcServiceFile sf, string name, EVerifyAdditionalType additionalType)
+        {
+            string filePath;
+            if (!UsedFileNames.TryGetValue(sf, out filePath))
+            {
+                // 名字不能重复
+                filePath = name;
+                var originalFileName = Path.GetFileName(name);
+                var fileName = originalFileName; 
+                int index = 1;
+                var fileList = UsedFileNames.Values.ToList();
+                bool found = false;
+                do
+                {
+                    found = false;
+                    foreach (var file in fileList)
+                    {
+                        if (file.EndsWith(fileName))
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (found)
+                    {
+                        fileName = $"{originalFileName}_{index++}";
+                        filePath = name.Replace(originalFileName, fileName);
+                    }
+                } while (found);
+                
+                UsedFileNames.Add(sf, filePath);
+            }
+
+            // 防止和虚幻文件冲突
+            filePath += "_g";
+            switch (additionalType)
+            {
+                case EVerifyAdditionalType.Header:
+                    return filePath + ".h";
+                case EVerifyAdditionalType.Cpp:
+                    return filePath + ".cpp";
+                default:
+                    return filePath;
+            }
+        }
+
+        private void MergeFile(string turboLinkBaseName, GrpcServiceFile serviceFile)
+        {
+            var oldFiles = new List<GeneratedFile>(GeneratedFiles);
+            GeneratedFiles.Clear();
+            
+            var filePath = turboLinkBaseName.EndsWith("/") ?  turboLinkBaseName.Substring(0, turboLinkBaseName.Length - 1) : turboLinkBaseName;
+            var file = new GeneratedFile();
+            file.FileName = string.Join("/", VerifyFileName(serviceFile, filePath, EVerifyAdditionalType.Header));
+            
+            using (var sw = new StringWriter())
+            using (var writer = new IndentedTextWriter(sw, "\t"))
+            {
+                writer.WriteLine("//Generated by TurboLink CodeGenerator, do not edit!");
+                writer.WriteLine("#pragma once");
+                writer.WriteLine("#include \"TurboLinkGrpcMessage.h\"");                
+                foreach (var dependency in serviceFile.DependencyFiles)
+                {
+                    writer.WriteLine($"#include \"{VerifyFileName(dependency, GetHeaderFileName(dependency.PackageOriginalName), EVerifyAdditionalType.Header)}\"");
+                }
+                writer.WriteLine($"#include \"{VerifyFileName(serviceFile, GetHeaderFileName(serviceFile.PackageOriginalName), EVerifyAdditionalType.None)}.generated.h\"");
+                writer.WriteLine();
+                
+                var headerFiles = oldFiles.Where(f => f.FileName.EndsWith(".h"));
+                foreach (var temp in headerFiles)
+                {
+                    var block = VerifyFileName(temp.ServiceFile, temp.FileName.Replace(turboLinkBaseName, ""), EVerifyAdditionalType.None);
+                    writer.WriteLine($"// {block}");
+                    writer.Write(temp.Content);
+                    writer.WriteLine();
+                }
+                
+                file.Content = sw.ToString();
+                GeneratedFiles.Add(file);
+            }
+         
+            file = new GeneratedFile();
+            file.FileName = string.Join("/", VerifyFileName(serviceFile, filePath, EVerifyAdditionalType.Cpp));
+            
+            using (var sw = new StringWriter())
+            using (var writer = new IndentedTextWriter(sw, "\t"))
+            {
+                writer.WriteLine("//Generated by TurboLink CodeGenerator, do not edit!");
+                writer.WriteLine($"#include \"{VerifyFileName(serviceFile, GetHeaderFileName(serviceFile.PackageOriginalName), EVerifyAdditionalType.Header)}\"");
+                writer.WriteLine("#include \"google/protobuf/util/json_util.h\"");
+                writer.WriteLine();
+                
+                var cppFiles = oldFiles.Where(f => f.FileName.EndsWith(".cpp"));
+                foreach (var temp in cppFiles)
+                {
+                    var block = VerifyFileName(temp.ServiceFile, temp.FileName.Replace(turboLinkBaseName, ""), EVerifyAdditionalType.None);
+                    writer.WriteLine($"// {block}");
+                    writer.Write(temp.Content);
+                    writer.WriteLine();
+                }
+                
+                file.Content = sw.ToString();
+                GeneratedFiles.Add(file);
             }
         }
     }

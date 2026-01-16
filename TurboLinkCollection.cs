@@ -303,7 +303,7 @@ namespace protoc_gen_turbolink
 		{
 			get => "S" + CamelPackageName + "/" + CamelFileName;
 		}
-		public List<string> DependencyFiles { get; set; }
+		public List<GrpcServiceFile> DependencyFiles { get; set; }
 		public List<GrpcEnum> EnumArray { get; set; }
 		public List<GrpcMessage> MessageArray { get; set; }
 		public List<GrpcService> ServiceArray { get; set; }
@@ -392,11 +392,11 @@ namespace protoc_gen_turbolink
 		{
 			var serviceFile = GrpcServiceFiles[protoFileName];
 
-			serviceFile.DependencyFiles = new List<string>();
+			serviceFile.DependencyFiles = new List<GrpcServiceFile>();
 			foreach (string dependency in serviceFile.ProtoFileDesc.Dependency)
 			{
 				//set dependency file as turbolink base name, eg. "SGoogleProtobuf/Struct"
-				serviceFile.DependencyFiles.Add(GrpcServiceFiles[dependency].TurboLinkBasicFileName);
+				serviceFile.DependencyFiles.Add(GrpcServiceFiles[dependency]);
 			}
 			GrpcServiceFiles[protoFileName] = serviceFile;
 		}
@@ -450,6 +450,9 @@ namespace protoc_gen_turbolink
 			newEnum.DisplayName = serviceFile.CamelPackageName + "." + 
 				TurboLinkUtils.JoinString(parentNameList, ".") + 
 				enumDesc.Name;
+			newEnum.OriginalDisplayName = serviceFile.PackageOriginalName + "." + 
+			                              TurboLinkUtils.JoinString(parentNameList, ".") + 
+			                              enumDesc.Name;
 
 			newEnum.Fields = new List<GrpcEnumField>();
 			bool missingZeroField = true;
