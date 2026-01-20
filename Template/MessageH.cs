@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.CodeDom.Compiler;
 using Microsoft.CodeAnalysis;
 
@@ -102,15 +103,16 @@ namespace protoc_gen_turbolink.Template
                 writer.WriteLine("{");
                 writer.Indent++;
                 writer.WriteLine("GENERATED_BODY()");
-
-                if (g.GenerateDefaultFunctionCode && message is not GrpcMessage_Oneof)
-                    writer.WriteLine($"DECLARE_DEFAULT_FUNCTIONS()");
+                
+                // if (g.GenerateDefaultFunctionCode && message is not GrpcMessage_Oneof)
+                writer.WriteLine("DECLARE_DEFAULT_FUNCTIONS()");
 
                 if (message is GrpcMessage_Oneof oneof)
                 {
                     writer.WriteLine();
                     writer.WriteLine("UPROPERTY(BlueprintReadWrite, Category = TurboLink)");
                     writer.WriteLine($"{oneof.OneofEnum.Name} {oneof.CamelName}Case{{}};");
+                    // Console.WriteLine($"build oneof {oneof.OneofEnum.Name} {oneof.CamelName}");
                 }
 
                 foreach (var field in message.Fields)

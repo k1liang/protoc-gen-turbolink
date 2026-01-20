@@ -303,6 +303,7 @@ namespace protoc_gen_turbolink
 		{
 			get => "S" + CamelPackageName + "/" + CamelFileName;
 		}
+
 		public List<GrpcServiceFile> DependencyFiles { get; set; }
 		public List<GrpcEnum> EnumArray { get; set; }
 		public List<GrpcMessage> MessageArray { get; set; }
@@ -487,6 +488,7 @@ namespace protoc_gen_turbolink
 			//add nested message 
 			if (protoMessage.NestedType.Count > 0)
 			{
+				// Console.WriteLine($"AddMessage3 begin .................");
 				string[] currentMessageNameList = new string[parentMessageNameList.Length + 1];
 				parentMessageNameList.CopyTo(currentMessageNameList, 0);
 				currentMessageNameList[parentMessageNameList.Length] = protoMessage.Name;
@@ -496,6 +498,7 @@ namespace protoc_gen_turbolink
 					if (nestedProtoMessage.Options != null && nestedProtoMessage.Options.MapEntry) continue;
 					AddMessage(ref serviceFile, currentMessageNameList, nestedProtoMessage);
 				}
+				// Console.WriteLine($"AddMessage3 end .................");
 			}
 
 			//add oneof message
@@ -503,8 +506,13 @@ namespace protoc_gen_turbolink
 			Dictionary<int, Tuple<int, int>> oneofMessageMap = new Dictionary<int, Tuple<int, int>>(); 
 			if (protoMessage.OneofDecl.Count > 0)
 			{
+				// Console.WriteLine($"AddMessage2 begin .................");
 				for(int i=0; i< protoMessage.OneofDecl.Count; i++)
 				{
+					// optional float vitamin = 3，编译器生成的 AST 会把 vitamin 放进一个“隐式 oneof”里，这个 oneof 对应 has_vitamin 标志,所以这里要滤掉
+					bool isProto3OptionalOneof = protoMessage.OneofDecl[i].Name.StartsWith("_");
+					if(isProto3OptionalOneof) continue;
+					
 					oneofMessageMap.Add(i, new Tuple<int, int>(serviceFile.EnumArray.Count, serviceFile.MessageArray.Count));
 
 					GrpcEnum oneofEnum = new GrpcEnum();
@@ -513,6 +521,7 @@ namespace protoc_gen_turbolink
 					GrpcMessage_Oneof oneofMessage = new GrpcMessage_Oneof(protoMessage.OneofDecl[i], message, oneofEnum);
 					oneofMessage.Index = serviceFile.MessageArray.Count;
 					serviceFile.MessageArray.Add(oneofMessage);
+					// Console.WriteLine($"AddMessage2 {oneofMessage.Name} in {serviceFile.PackageOriginalName}, oneof: {protoMessage.OneofDecl[i]}");
 
 					//add oneof enum
 					oneofEnum.Name = "EGrpc" + oneofMessage.Name.Substring(5);
@@ -521,6 +530,7 @@ namespace protoc_gen_turbolink
 					oneofEnum.Fields = new List<GrpcEnumField>();
 					serviceFile.EnumArray.Add(oneofEnum);
 				}
+				// Console.WriteLine($"AddMessage2 end .................");
 			}
 
 			//add message field
@@ -543,7 +553,7 @@ namespace protoc_gen_turbolink
 					messageField = new GrpcMessageField_Single(field);
 				}
 
-				if (field.HasOneofIndex)
+				if (field.HasOneofIndex && oneofMessageMap.ContainsKey(field.OneofIndex))
 				{
 					//add enum field
 					GrpcEnum oneofEnum = serviceFile.EnumArray[oneofMessageMap[field.OneofIndex].Item1];
@@ -574,6 +584,8 @@ namespace protoc_gen_turbolink
 				protoMessage.Name,
 				message.Index);
 			serviceFile.MessageArray.Add(message);
+			
+			// Console.WriteLine($"AddMessage1 {message.Name} in {serviceFile.PackageOriginalName}, messageIndex: {message.Index}");
 		}
 		private void AddServices(string protoFileName)
 		{
@@ -593,19 +605,68 @@ namespace protoc_gen_turbolink
 			}
 			GrpcServiceFiles[protoFileName] = serviceFile;
 		}
+
 		private void AnalyzeMessage(string protoFileName)
 		{
 			var serviceFile = GrpcServiceFiles[protoFileName];
+			RebuildMessageIndices(serviceFile);
+			
+			while (!AnalyzeMessageImp(serviceFile))
+			{
+			}
+		}
 
-			//find message index that each field directly depends on
-			List<KeyValuePair<int, GrpcMessage>> insertList = new List<KeyValuePair<int, GrpcMessage>>(); //Item1=insert pos, Item2=message
+		private string GetMessageName(GrpcServiceFile serviceFile, GrpcMessage tmp, string Name)
+		{
+			return "." + serviceFile.PackageName + "." +
+			       TurboLinkUtils.JoinString(tmp.ParentMessageNameList, ".") +
+			       Name;
+		}
+
+		private void RebuildMessageIndices(GrpcServiceFile serviceFile)
+		{
+			// rebuild message index map
+			serviceFile.Message2IndexMap.Clear();
+			for(int i=0; i< serviceFile.MessageArray.Count; i++)
+			{
+				GrpcMessage tmp = serviceFile.MessageArray[i];
+				tmp.Index = i;
+								
+				if(tmp.MessageDesc != null)
+				{
+					serviceFile.Message2IndexMap.Add((GetMessageName(serviceFile, tmp, tmp.MessageDesc.Name)), i);		
+					// Console.WriteLine($"Message2IndexMap.Add: {GetMessageName(serviceFile, tmp, tmp.MessageDesc.Name)}, index: {i}");
+				}
+			}
+		}
+		private bool AnalyzeMessageImp(GrpcServiceFile serviceFile)
+		{
 			foreach(GrpcMessage message in serviceFile.MessageArray)
 			{
 				foreach(GrpcMessageField messageField in message.Fields)
 				{
-					if (messageField.FieldDesc==null || //Oneof message field
-						messageField.FieldDesc.Type != FieldDescriptorProto.Types.Type.Message) continue;
-					string typeName = messageField.FieldDesc.TypeName;
+					// if (messageField.FieldDesc==null || //Oneof message field
+					// 	messageField.FieldDesc.Type != FieldDescriptorProto.Types.Type.Message) continue;
+					string typeName = "";
+					int foundIndex = -1;
+					if (messageField.FieldDesc == null)
+					{
+						//Oneof message field
+						if (messageField is GrpcMessageField_Oneof)
+						{
+							GrpcMessageField_Oneof oneofMessageField = (GrpcMessageField_Oneof)messageField;
+							foundIndex = serviceFile.MessageArray.IndexOf(oneofMessageField.OneofMessage);
+						}
+						else
+						{
+							continue;
+						}
+					}
+
+					if (typeName.Length == 0)
+					{
+						typeName = messageField.FieldDesc?.TypeName;
+					}
 
 					if (messageField is GrpcMessageField_Map)
 					{
@@ -613,28 +674,31 @@ namespace protoc_gen_turbolink
 						GrpcMessageField_Map mapMessageField = (GrpcMessageField_Map)messageField;
 						typeName = mapMessageField.ValueField.FieldDesc.TypeName;
 					}
-					if (serviceFile.Message2IndexMap.ContainsKey(typeName))
+
+					// Console.WriteLine($"type name: {typeName}");
+					if ((foundIndex >= 0) || (typeName != null && serviceFile.Message2IndexMap.ContainsKey(typeName)))
 					{
-						int index = serviceFile.Message2IndexMap[typeName];
+						int index = foundIndex >= 0 ? foundIndex: serviceFile.Message2IndexMap[typeName];
 						if(index >= message.Index)
 						{
 							// 记录插入位置和消息，以便后续处理
-							insertList.Add(new KeyValuePair<int, GrpcMessage>(message.Index, serviceFile.MessageArray[index]));
-							
 							// messageField.NeedNativeMake = true;
-							// message.HasNativeMake = true;							
+							// message.HasNativeMake = true;
+							
+							// 插入新位置，然后重新排序
+							var msg = serviceFile.MessageArray[index];
+							serviceFile.MessageArray.RemoveAt(index);
+							serviceFile.MessageArray.Insert(message.Index, msg);
+							
+							// rebuild message index map
+							RebuildMessageIndices(serviceFile);
+							return false;
 						}
 					}
 				}
 			}
 
-			// insert dependent message before current message
-			for(int i=insertList.Count-1; i>=0; i--)
-			{
-				var pair = insertList[i];
-				serviceFile.MessageArray.Remove(pair.Value);
-				serviceFile.MessageArray.Insert(pair.Key, pair.Value);				
-			}
+			return true;
 		}
 	}
 }

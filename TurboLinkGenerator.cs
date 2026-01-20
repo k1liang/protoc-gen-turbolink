@@ -213,7 +213,7 @@ namespace protoc_gen_turbolink
             }
 
             // 防止和虚幻文件冲突
-            filePath += "_g";
+            filePath += "_gen";
             switch (additionalType)
             {
                 case EVerifyAdditionalType.Header:
