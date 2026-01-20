@@ -39,7 +39,7 @@ namespace protoc_gen_turbolink.Template
                     {
                         if (message is not GrpcMessage_Oneof)
                         {
-                            writer.WriteLine($"DEFINE_DEFAULT_FUNCTIONS({message.Name}, ::{message.GrpcName})");
+                            writer.WriteLine($"DEFINE_PB_DEFAULT_FUNCTIONS({message.Name}, ::{message.GrpcName})");
                         }
                     }
                 }

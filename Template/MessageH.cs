@@ -105,7 +105,7 @@ namespace protoc_gen_turbolink.Template
                 writer.WriteLine("GENERATED_BODY()");
                 
                 // if (g.GenerateDefaultFunctionCode && message is not GrpcMessage_Oneof)
-                writer.WriteLine("DECLARE_DEFAULT_FUNCTIONS()");
+                writer.WriteLine("DECLARE_PB_DEFAULT_FUNCTIONS()");
 
                 if (message is GrpcMessage_Oneof oneof)
                 {

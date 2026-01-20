@@ -50,7 +50,7 @@ namespace protoc_gen_turbolink
             bool generateBPHelper = false;
             string removeOutputSubDir = "";
             
-            GenerateParam generateParam;
+            GenerateParam generateParam = GenerateParam.Instance;
             generateParam.GenerateServiceCode = false;
             generateParam.GenerateDefaultFunctionCode = false;
             generateParam.GenerateBPHelper = false;

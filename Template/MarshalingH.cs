@@ -45,6 +45,7 @@ namespace protoc_gen_turbolink.Template
                     }
 
                     writer.WriteLine();
+                    
                 }
 
                 // 3. 消息转换函数声明 (Marshaling Functions)
