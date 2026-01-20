@@ -82,7 +82,7 @@ namespace protoc_gen_turbolink
             response.SupportedFeatures = (ulong)CodeGeneratorResponse.Types.Feature.Proto3Optional;
 
             //gather and analysis information from all service files
-            TurboLinkCollection collection = new TurboLinkCollection();
+            TurboLinkCollection collection = TurboLinkCollection.Instance;
             string error;
             if (!collection.AnalysisServiceFiles(request, out error))
             {

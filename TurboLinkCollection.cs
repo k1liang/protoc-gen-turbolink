@@ -341,9 +341,11 @@ namespace protoc_gen_turbolink
 	}
 	public class TurboLinkCollection
 	{
+		public static TurboLinkCollection Instance = new TurboLinkCollection();
 		public string InputFileNames;
 		//key=ProtoFileName
 		public Dictionary<string, GrpcServiceFile> GrpcServiceFiles = new Dictionary<string, GrpcServiceFile>();
+		public Dictionary<GrpcServiceFile, string> filePathToService = new Dictionary<GrpcServiceFile, string>();
 
 		public bool AnalysisServiceFiles(CodeGeneratorRequest request, out string error)
 		{
@@ -354,7 +356,9 @@ namespace protoc_gen_turbolink
 			//step 1: gather service information
 			foreach (FileDescriptorProto protoFile in request.ProtoFile)
 			{
-				GrpcServiceFiles.Add(protoFile.Name, new GrpcServiceFile(protoFile));
+				var sf = new GrpcServiceFile(protoFile);
+				GrpcServiceFiles.Add(protoFile.Name, sf);
+				filePathToService.Add(sf, protoFile.Name);
 				inputFileNames.Insert(0, System.IO.Path.GetFileNameWithoutExtension(protoFile.Name) + "_");
 			}
 			InputFileNames = inputFileNames.ToString();
