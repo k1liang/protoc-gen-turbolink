@@ -258,13 +258,26 @@ namespace protoc_gen_turbolink
                 {
                     writer.WriteLine($"#include \"{VerifyFileName(dependency, GetHeaderFileName(dependency.PackageOriginalName), EVerifyAdditionalType.Header)}\"");
                 }
-                
-                writer.WriteLine($"#include \"{VerifyFileName(s, GetHeaderFileName(s.PackageOriginalName), EVerifyAdditionalType.ProtoHeader)}\"");
-                string generatedHeader = VerifyFileName(s, GetHeaderFileName(s.PackageOriginalName), EVerifyAdditionalType.None) + ".generated.h";
-                writer.WriteLine($"#include \"{Path.GetFileName(generatedHeader)}\"");
-                writer.WriteLine();
-                
+
+                bool includeHeader = false;
                 var headerFiles = oldFiles.Where(f => f.FileName.EndsWith(".h"));
+                foreach (var temp in headerFiles)
+                {
+                    if (temp.Content.Trim().Length > 0)
+                    {
+                        includeHeader = true;
+                        break;
+                    }
+                }
+
+                if (includeHeader)
+                {
+                    writer.WriteLine($"#include \"{VerifyFileName(s, GetHeaderFileName(s.PackageOriginalName), EVerifyAdditionalType.ProtoHeader)}\"");
+                    string generatedHeader = VerifyFileName(s, GetHeaderFileName(s.PackageOriginalName), EVerifyAdditionalType.None) + ".generated.h";
+                    writer.WriteLine($"#include \"{Path.GetFileName(generatedHeader)}\"");
+                    writer.WriteLine();
+                }
+                
                 foreach (var temp in headerFiles)
                 {
                     var block = VerifyFileName(temp.ServiceFile, temp.FileName.Replace(turboLinkBaseName, ""), EVerifyAdditionalType.None);
