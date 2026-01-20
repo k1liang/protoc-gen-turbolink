@@ -194,5 +194,18 @@ namespace protoc_gen_turbolink
             "throw","true","try","typedef","typeid","typename","union","unsigned","using","virtual","void","volatile",
             "wchar_t","while","xor","xor_eq"
         };
+
+        public static string GetIncludeHeaderCodeWithPrefix(GenerateParam g, string header)
+        {
+            if (g.IncludePrefixPath.Length > 0)
+            {
+                string prefix = g.IncludePrefixPath.EndsWith("/") ? g.IncludePrefixPath : g.IncludePrefixPath + "/";
+                return prefix + header;
+            }
+            else
+            {
+                return header;
+            }
+        }
     }
 }

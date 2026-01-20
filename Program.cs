@@ -56,6 +56,7 @@ namespace protoc_gen_turbolink
             generateParam.GenerateBPHelper = false;
             generateParam.SingleOutputFile = true;
             generateParam.ExportPrefix = "";
+            generateParam.IncludePrefixPath = "";
 
             if (request.HasParameter)
 			{
@@ -71,6 +72,7 @@ namespace protoc_gen_turbolink
                 generateParam.GenerateBPHelper = GetBoolParam(paramDictionary, "GenerateBPHelper", generateParam.GenerateBPHelper);
                 generateParam.SingleOutputFile = GetBoolParam(paramDictionary, "SingleOutputFile", generateParam.SingleOutputFile);
                 generateParam.ExportPrefix = GetStringParam(paramDictionary, "ExportPrefix", generateParam.ExportPrefix);
+                generateParam.IncludePrefixPath = GetStringParam(paramDictionary, "IncludePrefixPath", generateParam.IncludePrefixPath);
                 removeOutputSubDir = GetStringParam(paramDictionary, "RemoveOutputSubDir", removeOutputSubDir);
             }
 
