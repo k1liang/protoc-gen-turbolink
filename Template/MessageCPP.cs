@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.CodeDom.Compiler;
+using System.Collections.Generic;
 
 namespace protoc_gen_turbolink.Template
 {
@@ -35,11 +36,19 @@ namespace protoc_gen_turbolink.Template
                         writer.WriteLine();
                     }
 
+                    var exportedMessages = new HashSet<GrpcMessage>();
                     foreach (var message in s.MessageArray)
                     {
-                        if (message is not GrpcMessage_Oneof)
+                        var msg = message;
+                        if (message is GrpcMessage_Oneof)
                         {
-                            writer.WriteLine($"DEFINE_PB_DEFAULT_FUNCTIONS({message.Name}, ::{message.GrpcName})");
+                            msg = (message as GrpcMessage_Oneof).ParentMessage;
+                        }
+                        
+                        if(exportedMessages.Contains(msg)) continue;
+                        exportedMessages.Add(msg);
+                        {
+                            writer.WriteLine($"DEFINE_PB_DEFAULT_FUNCTIONS({msg.Name}, ::{msg.GrpcName})");
                         }
                     }
                 }

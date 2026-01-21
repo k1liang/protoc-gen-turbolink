@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Collections.Generic;
+using System.Text;
 using Google.Protobuf.Reflection;
 
 namespace protoc_gen_turbolink.Template
@@ -37,12 +38,18 @@ namespace protoc_gen_turbolink.Template
             }
 
             // ===== 对应 T4: foreach(GrpcMessage message in s.MessageArray) =====
+            var exportedMessages = new HashSet<GrpcMessage>();
             foreach (GrpcMessage message in s.MessageArray)
             {
+                var msg = message;
                 if (message is GrpcMessage_Oneof)
-                    continue;
+                {
+                    msg = (message as GrpcMessage_Oneof).ParentMessage;   
+                }
 
-                GenerateMessageMarshalingDefine(sb, message);
+                if(exportedMessages.Contains(msg)) continue;
+                exportedMessages.Add(msg);
+                GenerateMessageMarshalingDefine(sb, msg);
                 sb.AppendLine();
             }
 

@@ -1,5 +1,7 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.CodeDom.Compiler;
+using System.Collections.Generic;
 
 namespace protoc_gen_turbolink.Template
 {
@@ -49,13 +51,21 @@ namespace protoc_gen_turbolink.Template
                 }
 
                 // 3. 消息转换函数声明 (Marshaling Functions)
+                var exportedMessages = new HashSet<GrpcMessage>();
                 foreach (var message in s.MessageArray)
                 {
                     // T4 中的 if(message is GrpcMessage_Oneof) continue;
-                    if (message is GrpcMessage_Oneof) continue;
+                    var msg = message;
+                    if (message is GrpcMessage_Oneof)
+                    {
+                        msg = ((GrpcMessage_Oneof)message).ParentMessage;
+                        // Console.WriteLine($"MessageDesc: {message.MessageDesc}, OneofDesc: {msg.OneofDesc}, ParentMessage: {msg.ParentMessage.GrpcName}");
+                    }
 
-                    writer.WriteLine($"void GRPC_TO_TURBOLINK(const ::{message.GrpcName}* in, {message.Name}* out);");
-                    writer.WriteLine($"void TURBOLINK_TO_GRPC(const {message.Name}* in, ::{message.GrpcName}* out);");
+                    if(exportedMessages.Contains(msg)) continue;
+                    exportedMessages.Add(msg);
+                    writer.WriteLine($"void GRPC_TO_TURBOLINK(const ::{msg.GrpcName}* in, {msg.Name}* out);");
+                    writer.WriteLine($"void TURBOLINK_TO_GRPC(const {msg.Name}* in, ::{msg.GrpcName}* out);");
                     writer.WriteLine();
                 }
 
