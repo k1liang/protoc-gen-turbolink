@@ -99,7 +99,7 @@ namespace protoc_gen_turbolink.Template
                     writer.WriteLine($"USTRUCT(BlueprintType, meta = (DisplayName=\"{message.OriginalDisplayName}\"))");
                 }
 
-                writer.WriteLine($"struct {g.ExportPrefix} {message.Name} : public FGrpcMessage");
+                writer.WriteLine($"struct {g.ExportPrefix} {message.Name} : public FPBMessage");
                 writer.WriteLine("{");
                 writer.Indent++;
                 writer.WriteLine("GENERATED_BODY()");
