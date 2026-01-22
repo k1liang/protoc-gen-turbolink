@@ -128,6 +128,20 @@ namespace protoc_gen_turbolink.Template
                         writer.WriteLine($"{field.FieldType} {field.FieldName}{field.FieldDefaultValue};");
                     }
                 }
+
+                if (message.MessageDesc != null && s.CommentParser.messageInfos.TryGetValue(message.MessageDesc, out var info))
+                {
+                    writer.WriteLine();
+                    foreach(var tagInfo in info.TagInfos)
+                    {
+                        if (tagInfo.Tag == "add")
+                        {
+                            writer.WriteLine(tagInfo.Info.Replace("_UESTRUCT", message.Name));
+                        }
+                        writer.WriteLine();
+                    }
+                }
+                
                 writer.Indent--;
                 writer.WriteLine("};");
             }

@@ -8,6 +8,7 @@ using System.Text.Json;
 using Google.Protobuf.Compiler;
 using Google.Protobuf.Reflection;
 using Google.Protobuf.Collections;
+using System.Data;
 
 namespace protoc_gen_turbolink
 {
@@ -273,6 +274,7 @@ namespace protoc_gen_turbolink
 	public class GrpcServiceFile
 	{
 		public readonly FileDescriptorProto ProtoFileDesc;
+		public ProtoCommentParser CommentParser;
 		//split package name as string array
 		public readonly string[] PackageNameAsList;
 		public string FileName								//eg. "hello.proto", "google/protobuf/struct.proto"
@@ -362,33 +364,41 @@ namespace protoc_gen_turbolink
 				inputFileNames.Insert(0, System.IO.Path.GetFileNameWithoutExtension(protoFile.Name) + "_");
 			}
 			InputFileNames = inputFileNames.ToString();
+			
+			var protoFileNames = GrpcServiceFiles.Keys.ToList();
 
 			//step 2: imported proto files
-			foreach (string protoFileName in GrpcServiceFiles.Keys.ToList())
+			foreach (string protoFileName in protoFileNames)
 			{
 				AddDependencyFiles(protoFileName);
 			}
 
 			//setp 3: enum (include nested enum)
-			foreach (string protoFileName in GrpcServiceFiles.Keys.ToList())
+			foreach (string protoFileName in protoFileNames)
 			{
 				AddEnums(protoFileName);
 			}
 
 			//step 4: message(include nested message and oneof message)
-			foreach (string protoFileName in GrpcServiceFiles.Keys.ToList())
+			foreach (string protoFileName in protoFileNames)
 			{
 				AddMessages(protoFileName);
 			}
 			//step 5: service
-			foreach (string protoFileName in GrpcServiceFiles.Keys.ToList())
+			foreach (string protoFileName in protoFileNames)
 			{
 				AddServices(protoFileName);
 			}
 			//step 6: scan message field to analyze the interdependencies between messages
-			foreach (string protoFileName in GrpcServiceFiles.Keys.ToList())
+			foreach (string protoFileName in protoFileNames)
 			{
 				AnalyzeMessage(protoFileName);
+			}
+
+			//step 7: 解析注释信息
+			foreach (string protoFileName in protoFileNames)
+			{
+				ParseComments(protoFileName);
 			}
 
 			return true;
@@ -703,6 +713,13 @@ namespace protoc_gen_turbolink
 			}
 
 			return true;
+		}
+
+		private void ParseComments(string protoFileName)
+		{
+			var serviceFile = GrpcServiceFiles[protoFileName];
+			serviceFile.CommentParser = new ProtoCommentParser(serviceFile.ProtoFileDesc);
+			serviceFile.CommentParser.ParseAllMessages();
 		}
 	}
 }
