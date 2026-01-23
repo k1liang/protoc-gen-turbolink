@@ -115,6 +115,9 @@ namespace protoc_gen_turbolink.Template
                     // Console.WriteLine($"build oneof {oneof.OneofEnum.Name} {oneof.CamelName}");
                 }
 
+                MessageInfo messageTagInfo = null;
+                if(message.MessageDesc != null) s.CommentParser.MessageInfos.TryGetValue(message.MessageDesc, out messageTagInfo);
+                
                 foreach (var field in message.Fields)
                 {
                     writer.WriteLine();
@@ -124,21 +127,34 @@ namespace protoc_gen_turbolink.Template
                     }
                     else
                     {
-                        writer.WriteLine("UPROPERTY(BlueprintReadWrite, Category = TurboLink)");
+                        FieldInfoEx exInfo = null;
+                        if (messageTagInfo != null) messageTagInfo.Fields.TryGetValue(field.FieldDesc, out exInfo);
+                        var tagInfo = exInfo?.TagInfos.Find((TagInfo info) =>
+                        {
+                            return info.Tag == "BlueprintReadWrite";
+                        });
+                        bool enableBlueprintReadWrite = tagInfo == null || tagInfo.Info.ToLower() != "false";
+                        if (enableBlueprintReadWrite)
+                        {
+                            writer.WriteLine("UPROPERTY(BlueprintReadWrite, Category = TurboLink)");
+                        }
+                        else
+                        {
+                            writer.WriteLine("UPROPERTY(Category = TurboLink)");
+                        }
                         writer.WriteLine($"{field.FieldType} {field.FieldName}{field.FieldDefaultValue};");
                     }
                 }
 
-                if (message.MessageDesc != null && s.CommentParser.messageInfos.TryGetValue(message.MessageDesc, out var info))
+                if (messageTagInfo != null)
                 {
                     writer.WriteLine();
-                    foreach(var tagInfo in info.TagInfos)
+                    foreach(var tagInfo in messageTagInfo.TagInfos)
                     {
                         if (tagInfo.Tag == "add")
                         {
                             writer.WriteLine(tagInfo.Info.Replace("_UESTRUCT", message.Name));
                         }
-                        writer.WriteLine();
                     }
                 }
                 

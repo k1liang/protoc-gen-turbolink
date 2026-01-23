@@ -54,8 +54,17 @@ namespace protoc_gen_turbolink
 		}
 		public virtual string FieldName							//eg. "Age", "MyName", "Gender", "AddressArray"
 		{
-			get => TurboLinkUtils.GetMessageFieldName(FieldDesc);
+			get
+			{
+				if (ProtoCommentParser.GlobalFieldInfos.TryGetValue(FieldDesc, out var info))
+				{
+					var newNameInfo = info.TagInfos.Find((TagInfo info) => { return info.Tag == "rename"; });
+					if (newNameInfo != null) return newNameInfo.Info;
+				}
+				return TurboLinkUtils.GetMessageFieldName(FieldDesc);
+			}
 		}
+
 		public string FieldGrpcName { get; set; }				//eg. "age", "my_name", "gender", "address_array"
 		public abstract string TypeAsNativeField                //eg. "TSharedPtr<FGrpcUserRegisterRequestAddress>", "TArray<TSharedPtr<FGrpcUserRegisterRequestAddress>>"
 		{
