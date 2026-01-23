@@ -116,7 +116,7 @@ namespace protoc_gen_turbolink.Template
                 }
 
                 MessageInfo messageTagInfo = null;
-                if(message.MessageDesc != null) s.CommentParser.MessageInfos.TryGetValue(message.MessageDesc, out messageTagInfo);
+                if(message.MessageDesc != null) ProtoCommentParser.GlobalMessageInfos.TryGetValue(message.MessageDesc, out messageTagInfo);
                 
                 foreach (var field in message.Fields)
                 {
@@ -140,7 +140,7 @@ namespace protoc_gen_turbolink.Template
                         }
                         else
                         {
-                            writer.WriteLine("UPROPERTY(Category = TurboLink)");
+                            writer.WriteLine("UPROPERTY()");
                         }
                         writer.WriteLine($"{field.FieldType} {field.FieldName}{field.FieldDefaultValue};");
                     }

@@ -100,6 +100,16 @@ namespace protoc_gen_turbolink.Template
 
         private void GenerateMessageMarshalingDefine(StringBuilder sb, GrpcMessage message)
         {
+            if (ProtoCommentParser.GlobalMessageInfos.TryGetValue(message.MessageDesc, out var info))
+            {
+                var tagInfo = info.TagInfos.Find(item => item.Tag == TagDefine.ExportConvertFunctionImplement);
+                if(tagInfo != null && tagInfo.Info.ToLower() == "false")
+                {
+                    // 不导出实现函数
+                    return;
+                }
+            }
+            
             // ---------- GRPC_TO_TURBOLINK ----------
             sb.AppendLine($"void GRPC_TO_TURBOLINK(const ::{message.GrpcName}* in, {message.Name}* out)");
             sb.AppendLine("{");

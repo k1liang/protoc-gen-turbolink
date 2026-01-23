@@ -12,6 +12,7 @@ public static class TagDefine
     public static string Rename = "Rename";
     public static string BlueprintReadWrite = "BlueprintReadWrite";
     public static string DefaultValue = "DefaultValue";
+    public static string ExportConvertFunctionImplement = "ExportConvertFunctionImplement";
 }
 
 public sealed class TagInfo
@@ -41,7 +42,7 @@ public sealed class MessageInfo
 public sealed class ProtoCommentParser
 {
     public FileDescriptorProto ProtoFileDesc;
-    public Dictionary<DescriptorProto, MessageInfo> MessageInfos;
+    public static Dictionary<DescriptorProto, MessageInfo> GlobalMessageInfos = new Dictionary<DescriptorProto, MessageInfo>();
     public static Dictionary<FieldDescriptorProto, FieldInfoEx> GlobalFieldInfos = new();
 
     public ProtoCommentParser(FileDescriptorProto protoFileDesc)
@@ -51,8 +52,6 @@ public sealed class ProtoCommentParser
 
     public void ParseAllMessages()
     {
-        MessageInfos = new Dictionary<DescriptorProto, MessageInfo>();
-
         var sourceInfo = ProtoFileDesc.SourceCodeInfo;
         if (sourceInfo == null)
             return;
@@ -92,13 +91,13 @@ public sealed class ProtoCommentParser
             if (target == null || target.Message == null)
                 continue;
 
-            if (!MessageInfos.TryGetValue(target.Message, out var msgInfo))
+            if (!GlobalMessageInfos.TryGetValue(target.Message, out var msgInfo))
             {
                 msgInfo = new MessageInfo
                 {
                     Descriptor = target.Message
                 };
-                MessageInfos.Add(target.Message, msgInfo);
+                GlobalMessageInfos.Add(target.Message, msgInfo);
             }
 
             if (target.Field == null)
