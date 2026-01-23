@@ -729,6 +729,28 @@ namespace protoc_gen_turbolink
 			var serviceFile = GrpcServiceFiles[protoFileName];
 			serviceFile.CommentParser = new ProtoCommentParser(serviceFile.ProtoFileDesc);
 			serviceFile.CommentParser.ParseAllMessages();
+
+			VerifyDefaultValues(serviceFile);
+		}
+
+		private void VerifyDefaultValues(GrpcServiceFile serviceFile)
+		{
+			foreach (var message in serviceFile.MessageArray)
+			{
+				if(message.Fields == null) continue;
+				
+				foreach (var field in message.Fields)
+				{
+					if (field.FieldDesc != null && ProtoCommentParser.GlobalFieldInfos.TryGetValue(field.FieldDesc, out var tagInfo))
+					{
+						var defaultValueInfo = tagInfo.TagInfos.Find((info => info.Tag == TagDefine.DefaultValue));
+						if (defaultValueInfo != null)
+						{
+							field.FieldDefaultValue = " = " + defaultValueInfo.Info;
+						}
+					}
+				}
+			}
 		}
 	}
 }

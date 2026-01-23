@@ -11,6 +11,7 @@ public static class TagDefine
     public static string AppendCode = "AppendCode";
     public static string Rename = "Rename";
     public static string BlueprintReadWrite = "BlueprintReadWrite";
+    public static string DefaultValue = "DefaultValue";
 }
 
 public sealed class TagInfo
