@@ -72,10 +72,18 @@ namespace protoc_gen_turbolink.Template
             {
                 return $"StaticCast<{field.FieldType}>({getField})";
             }
-            else
+            else if (field.FieldDesc.Type == FieldDescriptorProto.Types.Type.Float)
             {
-                return getField;
+                if (ProtoCommentParser.GlobalFieldInfos.TryGetValue(field.FieldDesc, out var info))
+                {
+                    if (info.TagInfos.Find(tmp => tmp.Tag == TagDefine.RoundToFloat) != null)
+                    {
+                        return $"FTurboLinkGrpcMessageUtil::RoundToFloat({getField})";
+                    }
+                }
             }
+            
+            return getField;
         }
 
         private string ConvertFieldFromTurboLinkToGrpc(GrpcMessageField field, string getField)
@@ -92,10 +100,8 @@ namespace protoc_gen_turbolink.Template
             {
                 return $"{field.FieldGrpcType}(static_cast<uint8>({getField}))";
             }
-            else
-            {
-                return getField;
-            }
+            
+            return getField;
         }
 
         private void GenerateMessageMarshalingDefine(StringBuilder sb, GrpcMessage message)
@@ -119,28 +125,29 @@ namespace protoc_gen_turbolink.Template
                 if (field is GrpcMessageField_Map mapField)
                 {
                     sb.AppendLine($"    out->{mapField.FieldName}.Empty(in->{mapField.FieldGrpcName}_size());");
-                    sb.AppendLine($"    for (const auto& item : in->{mapField.FieldGrpcName}()) {{");
+                    sb.AppendLine($"    for (const auto& item : in->{mapField.FieldGrpcName}())");
+                    sb.AppendLine("    {");
 
                     if (field.NeedNativeMake)
                     {
-                        sb.AppendLine($"    {mapField.ValueField.FieldType} field;");
-                        sb.AppendLine($"    GRPC_TO_TURBOLINK(&item.second, &field);");
+                        sb.AppendLine($"        {mapField.ValueField.FieldType} field;");
+                        sb.AppendLine($"        GRPC_TO_TURBOLINK(&item.second, &field);");
                         sb.AppendLine(
-                            $"    out->{mapField.FieldName}.Add(StringCast<TCHAR>((const UTF8CHAR*)item.first.c_str()).Get(), MakeShareable(new {mapField.ValueField.FieldType}(field)));");
+                            $"        out->{mapField.FieldName}.Add(StringCast<TCHAR>((const UTF8CHAR*)item.first.c_str()).Get(), MakeShareable(new {mapField.ValueField.FieldType}(field)));");
                     }
                     else
                     {
                         var keyExpr = ConvertFieldFromGrpcToTurboLink(mapField.KeyField, "item.first");
-                        sb.AppendLine($"    auto& value = out->{mapField.FieldName}.Add({keyExpr});");
+                        sb.AppendLine($"        auto& value = out->{mapField.FieldName}.Add({keyExpr});");
 
                         if (mapField.ValueField.FieldDesc.Type == FieldDescriptorProto.Types.Type.Message)
                         {
-                            sb.AppendLine($"    GRPC_TO_TURBOLINK(&item.second, &value);");
+                            sb.AppendLine($"        GRPC_TO_TURBOLINK(&item.second, &value);");
                         }
                         else
                         {
                             var valExpr = ConvertFieldFromGrpcToTurboLink(mapField.ValueField, "item.second");
-                            sb.AppendLine($"    value = {valExpr};");
+                            sb.AppendLine($"        value = {valExpr};");
                         }
                     }
 
@@ -149,23 +156,24 @@ namespace protoc_gen_turbolink.Template
                 else if (field is GrpcMessageField_Repeated repeatedField)
                 {
                     sb.AppendLine($"    out->{repeatedField.FieldName}.Empty(in->{repeatedField.FieldGrpcName}_size());");
-                    sb.AppendLine($"    for (int i=0; i<in->{repeatedField.FieldGrpcName}_size(); ++i) {{");
+                    sb.AppendLine($"    for (int i=0; i<in->{repeatedField.FieldGrpcName}_size(); ++i)");
+                    sb.AppendLine("    {");
 
                     if (field.NeedNativeMake)
                     {
-                        sb.AppendLine($"    {repeatedField.ItemField.FieldType} field;");
-                        sb.AppendLine($"    GRPC_TO_TURBOLINK(&(in->{repeatedField.FieldGrpcName}(i)), &field);");
-                        sb.AppendLine($"    out->{repeatedField.FieldName}.Add(MakeShareable(new {repeatedField.ItemField.FieldType}(field)));");
+                        sb.AppendLine($"        {repeatedField.ItemField.FieldType} field;");
+                        sb.AppendLine($"        GRPC_TO_TURBOLINK(&(in->{repeatedField.FieldGrpcName}(i)), &field);");
+                        sb.AppendLine($"        out->{repeatedField.FieldName}.Add(MakeShareable(new {repeatedField.ItemField.FieldType}(field)));");
                     }
                     else if (field.FieldDesc.Type == FieldDescriptorProto.Types.Type.Message)
                     {
-                        sb.AppendLine($"    GRPC_TO_TURBOLINK(&(in->{repeatedField.FieldGrpcName}(i)), &(out->{repeatedField.FieldName}.AddZeroed_GetRef()));");
+                        sb.AppendLine($"        GRPC_TO_TURBOLINK(&(in->{repeatedField.FieldGrpcName}(i)), &(out->{repeatedField.FieldName}.AddZeroed_GetRef()));");
                     }
                     else
                     {
                         var getField = $"in->{repeatedField.FieldGrpcName}(i)";
                         var valExpr = ConvertFieldFromGrpcToTurboLink(repeatedField.ItemField, getField);
-                        sb.AppendLine($"    out->{repeatedField.FieldName}.Add({valExpr});");
+                        sb.AppendLine($"        out->{repeatedField.FieldName}.Add({valExpr});");
                     }
 
                     sb.AppendLine("    }");
@@ -181,23 +189,23 @@ namespace protoc_gen_turbolink.Template
                         if (fieldOfOneofMessage.NeedNativeMake)
                         {
                             sb.AppendLine("    {");
-                            sb.AppendLine($"    {fieldOfOneofMessage.FieldType} field;");
-                            sb.AppendLine($"    GRPC_TO_TURBOLINK(&(in->{fieldOfOneofMessage.FieldGrpcName}()), &field);");
-                            sb.AppendLine($"    out->{field.FieldName}.{fieldOfOneofMessage.FieldName}=MakeShareable(new {fieldOfOneofMessage.FieldType}(field));");
-                            sb.AppendLine($"    out->{field.FieldName}.{field.FieldName}Case = {((GrpcMessage_Oneof)oneofMessage).OneofEnum.Name}::{fieldOfOneofMessage.FieldName};");
+                            sb.AppendLine($"        {fieldOfOneofMessage.FieldType} field;");
+                            sb.AppendLine($"        GRPC_TO_TURBOLINK(&(in->{fieldOfOneofMessage.FieldGrpcName}()), &field);");
+                            sb.AppendLine($"        out->{field.FieldName}.{fieldOfOneofMessage.FieldName}=MakeShareable(new {fieldOfOneofMessage.FieldType}(field));");
+                            sb.AppendLine($"        out->{field.FieldName}.{field.FieldName}Case = {((GrpcMessage_Oneof)oneofMessage).OneofEnum.Name}::{fieldOfOneofMessage.FieldName};");
                             sb.AppendLine("    }");
                         }
                         else if (fieldOfOneofMessage.FieldDesc.Type == FieldDescriptorProto.Types.Type.Message)
                         {
-                            sb.AppendLine($"    GRPC_TO_TURBOLINK(&(in->{fieldOfOneofMessage.FieldGrpcName}()), &(out->{field.FieldName}.{fieldOfOneofMessage.FieldName}));");
-                            sb.AppendLine($"    out->{field.FieldName}.{field.FieldName}Case = {((GrpcMessage_Oneof)oneofMessage).OneofEnum.Name}::{fieldOfOneofMessage.FieldName};");
+                            sb.AppendLine($"        GRPC_TO_TURBOLINK(&(in->{fieldOfOneofMessage.FieldGrpcName}()), &(out->{field.FieldName}.{fieldOfOneofMessage.FieldName}));");
+                            sb.AppendLine($"        out->{field.FieldName}.{field.FieldName}Case = {((GrpcMessage_Oneof)oneofMessage).OneofEnum.Name}::{fieldOfOneofMessage.FieldName};");
                         }
                         else
                         {
                             var getField = $"in->{fieldOfOneofMessage.FieldGrpcName}()";
                             var valExpr = ConvertFieldFromGrpcToTurboLink(fieldOfOneofMessage, getField);
-                            sb.AppendLine($"    out->{field.FieldName}.{fieldOfOneofMessage.FieldName}={valExpr};");
-                            sb.AppendLine($"    out->{field.FieldName}.{field.FieldName}Case = {((GrpcMessage_Oneof)oneofMessage).OneofEnum.Name}::{fieldOfOneofMessage.FieldName};");
+                            sb.AppendLine($"        out->{field.FieldName}.{fieldOfOneofMessage.FieldName}={valExpr};");
+                            sb.AppendLine($"        out->{field.FieldName}.{field.FieldName}Case = {((GrpcMessage_Oneof)oneofMessage).OneofEnum.Name}::{fieldOfOneofMessage.FieldName};");
                         }
 
                         sb.AppendLine("    break;");
@@ -209,9 +217,9 @@ namespace protoc_gen_turbolink.Template
                     if (field.NeedNativeMake)
                     {
                         sb.AppendLine("    {");
-                        sb.AppendLine($"    {field.FieldType} field;");
-                        sb.AppendLine($"    GRPC_TO_TURBOLINK(&(in->{field.FieldGrpcName}()), &field);");
-                        sb.AppendLine($"    out->{field.FieldName} = MakeShareable(new {field.FieldType}(field));");
+                        sb.AppendLine($"        {field.FieldType} field;");
+                        sb.AppendLine($"        GRPC_TO_TURBOLINK(&(in->{field.FieldGrpcName}()), &field);");
+                        sb.AppendLine($"        out->{field.FieldName} = MakeShareable(new {field.FieldType}(field));");
                         sb.AppendLine("    }");
                     }
                     else if (field.FieldDesc.Type == FieldDescriptorProto.Types.Type.Message)
@@ -240,45 +248,47 @@ namespace protoc_gen_turbolink.Template
 
                 if (field is GrpcMessageField_Map mapField)
                 {
-                    sb.AppendLine($"    for (const auto& item : in->{mapField.FieldName}) {{");
+                    sb.AppendLine($"    for (const auto& item : in->{mapField.FieldName})");
+                    sb.AppendLine("    {");
                     if (field.NeedNativeMake)
                     {
-                        sb.AppendLine($"    {mapField.ValueField.FieldGrpcType} value;");
-                        sb.AppendLine($"    TURBOLINK_TO_GRPC(item.Value.Get(), &value);");
+                        sb.AppendLine($"        {mapField.ValueField.FieldGrpcType} value;");
+                        sb.AppendLine($"        TURBOLINK_TO_GRPC(item.Value.Get(), &value);");
                         var keyExpr = ConvertFieldFromTurboLinkToGrpc(mapField.KeyField, "item.Key");
-                        sb.AppendLine($"    (*(out->mutable_{mapField.FieldGrpcName}()))[{keyExpr}] = value;");
+                        sb.AppendLine($"        (*(out->mutable_{mapField.FieldGrpcName}()))[{keyExpr}] = value;");
                     }
                     else if (mapField.ValueField.FieldDesc.Type == FieldDescriptorProto.Types.Type.Message)
                     {
-                        sb.AppendLine($"    {mapField.ValueField.FieldGrpcType} value;");
-                        sb.AppendLine($"    TURBOLINK_TO_GRPC(&item.Value, &value);");
+                        sb.AppendLine($"        {mapField.ValueField.FieldGrpcType} value;");
+                        sb.AppendLine($"        TURBOLINK_TO_GRPC(&item.Value, &value);");
                         var keyExpr = ConvertFieldFromTurboLinkToGrpc(mapField.KeyField, "item.Key");
-                        sb.AppendLine($"    (*(out->mutable_{mapField.FieldGrpcName}()))[{keyExpr}] = value;");
+                        sb.AppendLine($"        (*(out->mutable_{mapField.FieldGrpcName}()))[{keyExpr}] = value;");
                     }
                     else
                     {
                         var keyExpr = ConvertFieldFromTurboLinkToGrpc(mapField.KeyField, "item.Key");
                         var valExpr = ConvertFieldFromTurboLinkToGrpc(mapField.ValueField, "item.Value");
-                        sb.AppendLine($"    (*(out->mutable_{mapField.FieldGrpcName}()))[{keyExpr}] = {valExpr};");
+                        sb.AppendLine($"        (*(out->mutable_{mapField.FieldGrpcName}()))[{keyExpr}] = {valExpr};");
                     }
 
                     sb.AppendLine("    }");
                 }
                 else if (field is GrpcMessageField_Repeated)
                 {
-                    sb.AppendLine($"    for(const auto& value : in->{field.FieldName}) {{");
+                    sb.AppendLine($"    for(const auto& value : in->{field.FieldName})");
+                    sb.AppendLine("    {");
                     if (field.NeedNativeMake)
                     {
-                        sb.AppendLine($"    TURBOLINK_TO_GRPC(value.Get(), out->add_{field.FieldGrpcName}());");
+                        sb.AppendLine($"        TURBOLINK_TO_GRPC(value.Get(), out->add_{field.FieldGrpcName}());");
                     }
                     else if (field.FieldDesc.Type == FieldDescriptorProto.Types.Type.Message)
                     {
-                        sb.AppendLine($"    TURBOLINK_TO_GRPC(&value, out->add_{field.FieldGrpcName}());");
+                        sb.AppendLine($"        TURBOLINK_TO_GRPC(&value, out->add_{field.FieldGrpcName}());");
                     }
                     else
                     {
                         var valExpr = ConvertFieldFromTurboLinkToGrpc(field, "value");
-                        sb.AppendLine($"    out->add_{field.FieldGrpcName}({valExpr});");
+                        sb.AppendLine($"        out->add_{field.FieldGrpcName}({valExpr});");
                     }
                     sb.AppendLine("    }");
                 }
@@ -293,19 +303,19 @@ namespace protoc_gen_turbolink.Template
                         sb.AppendLine($"    case {((GrpcMessage_Oneof)oneofMessage).OneofEnum.Name}::{fieldOfOneofMessage.FieldName}:");
                         if (fieldOfOneofMessage.NeedNativeMake)
                         {
-                            sb.AppendLine($"    TURBOLINK_TO_GRPC({getField}.Get(), out->mutable_{fieldOfOneofMessage.FieldGrpcName}());");
+                            sb.AppendLine($"        TURBOLINK_TO_GRPC({getField}.Get(), out->mutable_{fieldOfOneofMessage.FieldGrpcName}());");
                         }
                         else if (fieldOfOneofMessage.FieldDesc.Type == FieldDescriptorProto.Types.Type.Message)
                         {
-                            sb.AppendLine($"    TURBOLINK_TO_GRPC(&({getField}), out->mutable_{fieldOfOneofMessage.FieldGrpcName}());");
+                            sb.AppendLine($"        TURBOLINK_TO_GRPC(&({getField}), out->mutable_{fieldOfOneofMessage.FieldGrpcName}());");
                         }
                         else
                         {
                             var valExpr = ConvertFieldFromTurboLinkToGrpc(fieldOfOneofMessage, getField);
-                            sb.AppendLine($"    out->set_{fieldOfOneofMessage.FieldGrpcName}({valExpr});");
+                            sb.AppendLine($"        out->set_{fieldOfOneofMessage.FieldGrpcName}({valExpr});");
                         }
 
-                        sb.AppendLine("    break;");
+                        sb.AppendLine("        break;");
                     }
                     sb.AppendLine("    }");
                 }

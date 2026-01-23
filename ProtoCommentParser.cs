@@ -13,6 +13,7 @@ public static class TagDefine
     public static string BlueprintReadWrite = "BlueprintReadWrite";
     public static string DefaultValue = "DefaultValue";
     public static string ExportConvertFunctionImplement = "ExportConvertFunctionImplement";
+    public static string RoundToFloat = "RoundToFloat";
 }
 
 public sealed class TagInfo
@@ -141,16 +142,21 @@ public sealed class ProtoCommentParser
 
         var match = Regex.Match(
             trimmed,
-            @"^meta\(([^)]+)\)\s*:\s*(.*)$",
+            @"^meta\(([^)]+)\)(?:\s*:\s*(.*))?$",
             RegexOptions.IgnoreCase);
 
         if (!match.Success)
             return null;
 
+        string tag = match.Groups[1].Value.Trim();
+        string info = match.Groups[2].Success
+            ? match.Groups[2].Value.Trim()
+            : string.Empty;
+
         return new TagInfo
         {
-            Tag = match.Groups[1].Value.Trim(),
-            Info = match.Groups[2].Value.Trim()
+            Tag = tag,
+            Info = info
         };
     }
 
