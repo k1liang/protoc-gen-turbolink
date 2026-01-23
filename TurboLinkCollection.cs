@@ -58,7 +58,7 @@ namespace protoc_gen_turbolink
 			{
 				if (ProtoCommentParser.GlobalFieldInfos.TryGetValue(FieldDesc, out var info))
 				{
-					var newNameInfo = info.TagInfos.Find((TagInfo info) => { return info.Tag == "rename"; });
+					var newNameInfo = info.TagInfos.Find((TagInfo info) => { return info.Tag == TagDefine.Rename; });
 					if (newNameInfo != null) return newNameInfo.Info;
 				}
 				return TurboLinkUtils.GetMessageFieldName(FieldDesc);

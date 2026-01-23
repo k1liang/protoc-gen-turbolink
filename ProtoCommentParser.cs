@@ -6,6 +6,13 @@ using System.Text.RegularExpressions;
 
 #region 数据结构
 
+public static class TagDefine
+{
+    public static string AppendCode = "AppendCode";
+    public static string Rename = "Rename";
+    public static string BlueprintReadWrite = "BlueprintReadWrite";
+}
+
 public sealed class TagInfo
 {
     public string Tag;
