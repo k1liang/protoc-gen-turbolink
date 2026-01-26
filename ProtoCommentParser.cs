@@ -66,7 +66,7 @@ public sealed class ProtoCommentParser
     public static bool FindFieldMeta(FieldDescriptorProto field, string tag, out string info)
     {
         info = "";
-        if (GlobalFieldInfos.TryGetValue(field, out var infoArray))
+        if (field != null && GlobalFieldInfos.TryGetValue(field, out var infoArray))
         {
             var temp = infoArray.TagInfos.Find(tmp => tmp.Tag == tag);
             if (temp != null)
