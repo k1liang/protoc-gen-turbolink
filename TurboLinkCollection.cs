@@ -56,7 +56,7 @@ namespace protoc_gen_turbolink
 		{
 			get
 			{
-				if (ProtoCommentParser.FindFieldMeta(FieldDesc, TagDefine.Rename, out var info))
+				if (ProtoCommentParser.FindFieldMeta(FieldDesc, CommentTagDefine.Rename, out var info))
 				{
 					return info;
 				}
@@ -740,7 +740,7 @@ namespace protoc_gen_turbolink
 				
 				foreach (var field in message.Fields)
 				{
-					if (field.FieldDesc != null && ProtoCommentParser.FindFieldMeta(field.FieldDesc, TagDefine.DefaultValue, out var info))
+					if (field.FieldDesc != null && ProtoCommentParser.FindFieldMeta(field.FieldDesc, CommentTagDefine.DefaultValue, out var info))
 					{
 						field.FieldDefaultValue = " = " + info;
 					}

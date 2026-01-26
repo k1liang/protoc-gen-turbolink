@@ -131,7 +131,7 @@ namespace protoc_gen_turbolink.Template
                         if (messageTagInfo != null) messageTagInfo.Fields.TryGetValue(field.FieldDesc, out exInfo);
                         var tagInfo = exInfo?.TagInfos.Find((TagInfo info) =>
                         {
-                            return info.Tag == TagDefine.BlueprintReadWrite;
+                            return info.Tag == CommentTagDefine.BlueprintReadWrite;
                         });
                         bool enableBlueprintReadWrite = tagInfo == null || tagInfo.Info.ToLower() != "false";
                         if (enableBlueprintReadWrite)
@@ -151,7 +151,7 @@ namespace protoc_gen_turbolink.Template
                     writer.WriteLine();
                     foreach(var tagInfo in messageTagInfo.TagInfos)
                     {
-                        if (tagInfo.Tag == TagDefine.AppendCode)
+                        if (tagInfo.Tag == CommentTagDefine.AppendCode)
                         {
                             writer.WriteLine(tagInfo.Info.Replace("_UESTRUCT", message.Name));
                         }

@@ -77,7 +77,9 @@ namespace protoc_gen_turbolink
                 case FieldDescriptorProto.Types.Type.Bool:
                     ueType += "bool"; break;
                 case FieldDescriptorProto.Types.Type.String:
-                    ueType += "FString"; break;
+                    if(ProtoCommentParser.FindFieldMeta(field, CommentTagDefine.IsFName, out var _)) ueType += "FName"; 
+                    else ueType += "FString"; 
+                    break;
                 case FieldDescriptorProto.Types.Type.Group:
                     break; //Group type is deprecated and not supported in proto3
                 case FieldDescriptorProto.Types.Type.Message:
@@ -125,7 +127,7 @@ namespace protoc_gen_turbolink
                     finalDefaultValue += defaultValue != null ? defaultValue : "false"; 
                     break;
                 case FieldDescriptorProto.Types.Type.String:
-                    finalDefaultValue += defaultValue != null ? ("\"" + defaultValue + "\"") : "\"\""; 
+                    finalDefaultValue = defaultValue != null ? finalDefaultValue + ("TEXT(\"" + defaultValue + "\")") : ""; 
                     break;
                 case FieldDescriptorProto.Types.Type.Enum:
                     finalDefaultValue += defaultValue != null ? (GetFieldType(field) + "::" + defaultValue):("static_cast<" + GetFieldType(field) + ">(0)"); 

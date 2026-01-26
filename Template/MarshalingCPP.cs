@@ -86,9 +86,9 @@ namespace protoc_gen_turbolink.Template
 
         private static string[] ConvertTypeToStringTag = new string[]
         {
-            TagDefine.LowerString,
-            TagDefine.LowerStringKey,
-            TagDefine.LowerStringValue,
+            CommentTagDefine.LowerString,
+            CommentTagDefine.LowerStringKey,
+            CommentTagDefine.LowerStringValue,
         };
 
         private string ConvertFieldFromTurboLinkToGrpc(GrpcMessageField field, string getField, EConvertType convertType = EConvertType.Default, GrpcMessageField fieldWithMeta = null)
@@ -97,6 +97,10 @@ namespace protoc_gen_turbolink.Template
             {
                 string tempField = getField;
                 var checkField = fieldWithMeta ?? field;
+                if (ProtoCommentParser.FindFieldMeta(checkField.FieldDesc, CommentTagDefine.IsFName, out var _))
+                {
+                    tempField += ".ToString()";
+                }
                 if (ProtoCommentParser.FindFieldMeta(checkField.FieldDesc, ConvertTypeToStringTag[(int)convertType], out var _))
                 {
                     tempField += ".ToLower()";
@@ -113,7 +117,7 @@ namespace protoc_gen_turbolink.Template
             }
             else if (field.FieldDesc.Type == FieldDescriptorProto.Types.Type.Float)
             {
-                if (ProtoCommentParser.FindFieldMeta(field.FieldDesc, TagDefine.RoundToFloat, out var v))
+                if (ProtoCommentParser.FindFieldMeta(field.FieldDesc, CommentTagDefine.RoundToFloat, out var v))
                 {
                     if(v == "false") return getField;                    
                 }
@@ -126,7 +130,7 @@ namespace protoc_gen_turbolink.Template
 
         private void GenerateMessageMarshalingDefine(StringBuilder sb, GrpcMessage message)
         {
-            if (ProtoCommentParser.FindMessageMeta(message.MessageDesc, TagDefine.ExportConvertFunctionImplement, out var v))
+            if (ProtoCommentParser.FindMessageMeta(message.MessageDesc, CommentTagDefine.ExportConvertFunctionImplement, out var v))
             {
                 // 不导出实现函数
                 if (v.ToLower() == "false") return;

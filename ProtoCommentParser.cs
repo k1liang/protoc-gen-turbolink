@@ -6,17 +6,18 @@ using System.Text.RegularExpressions;
 
 #region 数据结构
 
-public static class TagDefine
+public static class CommentTagDefine
 {
-    public static string AppendCode = "AppendCode";
-    public static string Rename = "Rename";
-    public static string BlueprintReadWrite = "BlueprintReadWrite";
-    public static string DefaultValue = "DefaultValue";
-    public static string ExportConvertFunctionImplement = "ExportConvertFunctionImplement";
-    public static string RoundToFloat = "RoundToFloat";
-    public static string LowerString = "LowerString";
-    public static string LowerStringKey = "LowerStringKey";
-    public static string LowerStringValue = "LowerStringValue";
+    public const string AppendCode = "AppendCode";
+    public const string Rename = "Rename";
+    public const string BlueprintReadWrite = "BlueprintReadWrite";
+    public const string DefaultValue = "DefaultValue";
+    public const string ExportConvertFunctionImplement = "ExportConvertFunctionImplement";
+    public const string RoundToFloat = "RoundToFloat";
+    public const string LowerString = "LowerString";
+    public const string LowerStringKey = "LowerStringKey";
+    public const string LowerStringValue = "LowerStringValue";
+    public const string IsFName = "IsFName";
 }
 
 public sealed class TagInfo
