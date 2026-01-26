@@ -14,6 +14,9 @@ public static class TagDefine
     public static string DefaultValue = "DefaultValue";
     public static string ExportConvertFunctionImplement = "ExportConvertFunctionImplement";
     public static string RoundToFloat = "RoundToFloat";
+    public static string LowerString = "LowerString";
+    public static string LowerStringKey = "LowerStringKey";
+    public static string LowerStringValue = "LowerStringValue";
 }
 
 public sealed class TagInfo
@@ -45,6 +48,35 @@ public sealed class ProtoCommentParser
     public FileDescriptorProto ProtoFileDesc;
     public static Dictionary<DescriptorProto, MessageInfo> GlobalMessageInfos = new Dictionary<DescriptorProto, MessageInfo>();
     public static Dictionary<FieldDescriptorProto, FieldInfoEx> GlobalFieldInfos = new();
+
+    public static bool FindMessageMeta(DescriptorProto file, string tag, out string info)
+    {
+        info = "";
+        if (GlobalMessageInfos.TryGetValue(file, out var infoArray))
+        {
+            var temp = infoArray.TagInfos.Find(tmp => tmp.Tag == tag);
+            if (temp != null)
+            {
+                info = temp.Info;
+                return true;
+            }
+        }
+        return false;
+    }
+    public static bool FindFieldMeta(FieldDescriptorProto field, string tag, out string info)
+    {
+        info = "";
+        if (GlobalFieldInfos.TryGetValue(field, out var infoArray))
+        {
+            var temp = infoArray.TagInfos.Find(tmp => tmp.Tag == tag);
+            if (temp != null)
+            {
+                info = temp.Info;
+                return true;
+            }
+        }
+        return false;
+    }
 
     public ProtoCommentParser(FileDescriptorProto protoFileDesc)
     {

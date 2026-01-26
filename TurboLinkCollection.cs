@@ -56,10 +56,9 @@ namespace protoc_gen_turbolink
 		{
 			get
 			{
-				if (ProtoCommentParser.GlobalFieldInfos.TryGetValue(FieldDesc, out var info))
+				if (ProtoCommentParser.FindFieldMeta(FieldDesc, TagDefine.Rename, out var info))
 				{
-					var newNameInfo = info.TagInfos.Find((TagInfo info) => { return info.Tag == TagDefine.Rename; });
-					if (newNameInfo != null) return newNameInfo.Info;
+					return info;
 				}
 				return TurboLinkUtils.GetMessageFieldName(FieldDesc);
 			}
@@ -741,13 +740,9 @@ namespace protoc_gen_turbolink
 				
 				foreach (var field in message.Fields)
 				{
-					if (field.FieldDesc != null && ProtoCommentParser.GlobalFieldInfos.TryGetValue(field.FieldDesc, out var tagInfo))
+					if (field.FieldDesc != null && ProtoCommentParser.FindFieldMeta(field.FieldDesc, TagDefine.DefaultValue, out var info))
 					{
-						var defaultValueInfo = tagInfo.TagInfos.Find((info => info.Tag == TagDefine.DefaultValue));
-						if (defaultValueInfo != null)
-						{
-							field.FieldDefaultValue = " = " + defaultValueInfo.Info;
-						}
+						field.FieldDefaultValue = " = " + info;
 					}
 				}
 			}
