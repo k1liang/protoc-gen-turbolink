@@ -51,7 +51,7 @@ namespace protoc_gen_turbolink
             string[] words = grpcName.Split(new char[] { '.' }, StringSplitOptions.RemoveEmptyEntries).ToArray();
             return prefix + JoinCamelString(words, string.Empty);
         }
-        public static string GetFieldType(FieldDescriptorProto field)
+        public static string GetFieldType(FieldDescriptorProto field, FieldDescriptorProto checkedField = null, string valueTag = CommentTagDefine.FValue)
         {
             string ueType = "";
             switch (field.Type)
@@ -77,9 +77,12 @@ namespace protoc_gen_turbolink
                 case FieldDescriptorProto.Types.Type.Bool:
                     ueType += "bool"; break;
                 case FieldDescriptorProto.Types.Type.String:
-                    if(ProtoCommentParser.FindFieldMeta(field, CommentTagDefine.IsFName, out var _)) ueType += "FName"; 
+                {
+                    var tempField = checkedField ?? field;
+                    if(ProtoCommentParser.ContainValueMeta(tempField, valueTag, CommentTagDefine.FName)) ueType += "FName"; 
                     else ueType += "FString"; 
                     break;
+                }
                 case FieldDescriptorProto.Types.Type.Group:
                     break; //Group type is deprecated and not supported in proto3
                 case FieldDescriptorProto.Types.Type.Message:

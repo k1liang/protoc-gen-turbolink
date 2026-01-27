@@ -15,9 +15,13 @@ public static class CommentTagDefine
     public const string ExportConvertFunctionImplement = "ExportConvertFunctionImplement";
     public const string RoundToFloat = "RoundToFloat";
     public const string LowerString = "LowerString";
-    public const string LowerStringKey = "LowerStringKey";
-    public const string LowerStringValue = "LowerStringValue";
-    public const string IsFName = "IsFName";
+    public const string FName = "FName";
+
+    public const string FValue = "FValue";
+    public const string MapFKey = "MapFKey";
+    public const string MapFValue = "MapFValue";
+    public const string ArrayFValue = "ArrayFValue";
+    public const string OneofFValue = "OneofFValue";
 }
 
 public sealed class TagInfo
@@ -76,6 +80,50 @@ public sealed class ProtoCommentParser
                 return true;
             }
         }
+        return false;
+    }
+    
+    public static bool FindFieldMetaArray(FieldDescriptorProto field, string tag, out List<string> info)
+    {
+        info = new List<string>();
+        if (field != null && GlobalFieldInfos.TryGetValue(field, out var infoArray))
+        {
+            foreach (var temp in infoArray.TagInfos)
+            {
+                if (temp.Tag == tag)
+                {
+                    info.Add(temp.Info);
+                }
+            }
+        }
+        return info.Count > 0;
+    }
+    
+    public static string ProcessMetaString(FieldDescriptorProto field, string tag, string inField)
+    {
+        var ret = inField;
+        if (FindFieldMetaArray(field, tag, out var infoList))
+        {
+            foreach (var tagInfo in infoList)
+            {
+                if (tagInfo == CommentTagDefine.FName) ret += ".ToString()";
+                else if (tagInfo == CommentTagDefine.LowerString) ret += ".ToLower()";
+            }
+        }
+
+        return ret;
+    }
+    
+    public static bool ContainValueMeta(FieldDescriptorProto field, string tag, string valueTag)
+    {
+        if (FindFieldMetaArray(field, tag, out var infoList))
+        {
+            foreach (var tagInfo in infoList)
+            {
+                if (tagInfo == valueTag) return true;
+            }
+        }
+
         return false;
     }
 
@@ -137,7 +185,7 @@ public sealed class ProtoCommentParser
             if (target.Field == null)
             {
                 // message 级 meta
-                msgInfo.TagInfos.Add(tagInfo);
+                msgInfo.TagInfos = msgInfo.TagInfos.Concat(tagInfo).ToList();
             }
             else
             {
@@ -152,7 +200,7 @@ public sealed class ProtoCommentParser
                     GlobalFieldInfos.Add(target.Field, fieldInfo);
                 }
 
-                fieldInfo.TagInfos.Add(tagInfo);
+                fieldInfo.TagInfos = fieldInfo.TagInfos.Concat(tagInfo).ToList();
             }
         }
     }
@@ -163,7 +211,7 @@ public sealed class ProtoCommentParser
     /// 解析单行 meta 注释：
     /// meta(Tag): Value
     /// </summary>
-    private static TagInfo ParseMetaTag(string commentLine)
+    private static List<TagInfo> ParseMetaTag(string commentLine)
     {
         if (string.IsNullOrWhiteSpace(commentLine))
             return null;
@@ -186,11 +234,18 @@ public sealed class ProtoCommentParser
             ? match.Groups[2].Value.Trim()
             : string.Empty;
 
-        return new TagInfo
+        var arr = info.Split(",");
+        var ret = new List<TagInfo>();
+        foreach (var tagInfo in arr)
         {
-            Tag = tag,
-            Info = info
-        };
+            ret.Add(new TagInfo
+            {
+                Tag = tag.Trim(),
+                Info = tagInfo.Trim()
+            });
+        }
+
+        return ret;
     }
 
     #endregion

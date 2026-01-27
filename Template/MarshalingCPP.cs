@@ -77,34 +77,12 @@ namespace protoc_gen_turbolink.Template
             return getField;
         }
 
-        enum EConvertType
-        {
-            Default = 0,
-            MapKey,
-            MapValue
-        }
-
-        private static string[] ConvertTypeToStringTag = new string[]
-        {
-            CommentTagDefine.LowerString,
-            CommentTagDefine.LowerStringKey,
-            CommentTagDefine.LowerStringValue,
-        };
-
-        private string ConvertFieldFromTurboLinkToGrpc(GrpcMessageField field, string getField, EConvertType convertType = EConvertType.Default, GrpcMessageField fieldWithMeta = null)
+        private string ConvertFieldFromTurboLinkToGrpc(GrpcMessageField field, string getField, string tag = CommentTagDefine.FValue, GrpcMessageField fieldWithMeta = null)
         {
             if (field.FieldDesc.Type == FieldDescriptorProto.Types.Type.String)
             {
-                string tempField = getField;
                 var checkField = fieldWithMeta ?? field;
-                if (ProtoCommentParser.FindFieldMeta(checkField.FieldDesc, CommentTagDefine.IsFName, out var _))
-                {
-                    tempField += ".ToString()";
-                }
-                if (ProtoCommentParser.FindFieldMeta(checkField.FieldDesc, ConvertTypeToStringTag[(int)convertType], out var _))
-                {
-                    tempField += ".ToLower()";
-                }
+                var tempField = ProtoCommentParser.ProcessMetaString(checkField.FieldDesc, tag, getField);
                 return $"(const char*)StringCast<UTF8CHAR>(*({tempField})).Get()";
             }
             else if (field.FieldDesc.Type == FieldDescriptorProto.Types.Type.Bytes)
@@ -274,20 +252,20 @@ namespace protoc_gen_turbolink.Template
                     {
                         sb.AppendLine($"        {mapField.ValueField.FieldGrpcType} value;");
                         sb.AppendLine($"        TURBOLINK_TO_GRPC(item.Value.Get(), &value);");
-                        var keyExpr = ConvertFieldFromTurboLinkToGrpc(mapField.KeyField, "item.Key", EConvertType.MapKey, field);
+                        var keyExpr = ConvertFieldFromTurboLinkToGrpc(mapField.KeyField, "item.Key", CommentTagDefine.MapFKey, field);
                         sb.AppendLine($"        (*(out->mutable_{mapField.FieldGrpcName}()))[{keyExpr}] = value;");
                     }
                     else if (mapField.ValueField.FieldDesc.Type == FieldDescriptorProto.Types.Type.Message)
                     {
                         sb.AppendLine($"        {mapField.ValueField.FieldGrpcType} value;");
                         sb.AppendLine($"        TURBOLINK_TO_GRPC(&item.Value, &value);");
-                        var keyExpr = ConvertFieldFromTurboLinkToGrpc(mapField.KeyField, "item.Key", EConvertType.MapKey, field);
+                        var keyExpr = ConvertFieldFromTurboLinkToGrpc(mapField.KeyField, "item.Key", CommentTagDefine.MapFKey, field);
                         sb.AppendLine($"        (*(out->mutable_{mapField.FieldGrpcName}()))[{keyExpr}] = value;");
                     }
                     else
                     {
-                        var keyExpr = ConvertFieldFromTurboLinkToGrpc(mapField.KeyField, "item.Key", EConvertType.MapKey, field);
-                        var valExpr = ConvertFieldFromTurboLinkToGrpc(mapField.ValueField, "item.Value", EConvertType.MapValue, field);
+                        var keyExpr = ConvertFieldFromTurboLinkToGrpc(mapField.KeyField, "item.Key", CommentTagDefine.MapFKey, field);
+                        var valExpr = ConvertFieldFromTurboLinkToGrpc(mapField.ValueField, "item.Value", CommentTagDefine.MapFValue, field);
                         sb.AppendLine($"        (*(out->mutable_{mapField.FieldGrpcName}()))[{keyExpr}] = {valExpr};");
                     }
 
@@ -307,7 +285,7 @@ namespace protoc_gen_turbolink.Template
                     }
                     else
                     {
-                        var valExpr = ConvertFieldFromTurboLinkToGrpc(field, "value", EConvertType.Default, field);
+                        var valExpr = ConvertFieldFromTurboLinkToGrpc(field, "value", CommentTagDefine.ArrayFValue, field);
                         sb.AppendLine($"        out->add_{field.FieldGrpcName}({valExpr});");
                     }
                     sb.AppendLine("    }");
@@ -331,7 +309,7 @@ namespace protoc_gen_turbolink.Template
                         }
                         else
                         {
-                            var valExpr = ConvertFieldFromTurboLinkToGrpc(fieldOfOneofMessage, getField, EConvertType.MapKey, field);
+                            var valExpr = ConvertFieldFromTurboLinkToGrpc(fieldOfOneofMessage, getField, CommentTagDefine.OneofFValue, field);
                             sb.AppendLine($"        out->set_{fieldOfOneofMessage.FieldGrpcName}({valExpr});");
                         }
 

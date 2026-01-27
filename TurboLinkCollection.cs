@@ -96,11 +96,20 @@ namespace protoc_gen_turbolink
 		}
 		public override string FieldType
 		{
-			get => "TArray<" + ItemField.FieldType + ">";
+			get
+			{
+				// return "TArray<" + ItemField.FieldType + ">";
+				return "TArray<" + TurboLinkUtils.GetFieldType(ItemField.FieldDesc, FieldDesc, CommentTagDefine.ArrayFValue) + ">";
+			}
 		}
+
 		public override string TypeAsNativeField
 		{
-			get => NeedNativeMake ? ("TArray<TSharedPtr<" + ItemField.FieldType + ">>") : FieldType;
+			get
+			{
+				// return NeedNativeMake ? ("TArray<TSharedPtr<" + ItemField.FieldType + ">>") : FieldType;
+				return NeedNativeMake ? ("TArray<TSharedPtr<" + TurboLinkUtils.GetFieldType(ItemField.FieldDesc, FieldDesc, CommentTagDefine.ArrayFValue) + ">>") : FieldType;
+			}
 		}
 	}
 	public class GrpcMessageField_Map : GrpcMessageField
@@ -114,11 +123,29 @@ namespace protoc_gen_turbolink
 		}
 		public override string FieldType
 		{
-			get => "TMap<" + KeyField.FieldType + ", " + ValueField.FieldType + ">";
+			get
+			{
+				// return "TMap<" + KeyField.FieldType + ", " + ValueField.FieldType + ">";
+				return "TMap<" 
+				       + TurboLinkUtils.GetFieldType(KeyField.FieldDesc, FieldDesc,  CommentTagDefine.MapFKey) 
+				       + ", " 
+				       + TurboLinkUtils.GetFieldType(ValueField.FieldDesc, FieldDesc,  CommentTagDefine.MapFValue)
+				       + ">";
+			}
 		}
+
 		public override string TypeAsNativeField
 		{
-			get => NeedNativeMake ? ("TMap<" + KeyField.FieldType + ", TSharedPtr<" + ValueField.FieldType + ">>") : FieldType;
+			get
+			{
+				// return NeedNativeMake
+				// 	? ("TMap<" + KeyField.FieldType + ", TSharedPtr<" + ValueField.FieldType + ">>")
+				// 	: FieldType;
+				return NeedNativeMake
+					? ("TMap<" + TurboLinkUtils.GetFieldType(KeyField.FieldDesc, FieldDesc,  CommentTagDefine.MapFKey) 
+					           + ", TSharedPtr<" + TurboLinkUtils.GetFieldType(ValueField.FieldDesc, FieldDesc,  CommentTagDefine.MapFValue) + ">>")
+					: FieldType;
+			}
 		}
 	}
 	public class GrpcMessageField_Oneof : GrpcMessageField
