@@ -252,20 +252,20 @@ namespace protoc_gen_turbolink.Template
                     {
                         sb.AppendLine($"        {mapField.ValueField.FieldGrpcType} value;");
                         sb.AppendLine($"        TURBOLINK_TO_GRPC(item.Value.Get(), &value);");
-                        var keyExpr = ConvertFieldFromTurboLinkToGrpc(mapField.KeyField, "item.Key", CommentTagDefine.MapFKey, field);
+                        var keyExpr = ConvertFieldFromTurboLinkToGrpc(mapField.KeyField, "item.Key", CommentTagDefine.FMapKey, field);
                         sb.AppendLine($"        (*(out->mutable_{mapField.FieldGrpcName}()))[{keyExpr}] = value;");
                     }
                     else if (mapField.ValueField.FieldDesc.Type == FieldDescriptorProto.Types.Type.Message)
                     {
                         sb.AppendLine($"        {mapField.ValueField.FieldGrpcType} value;");
                         sb.AppendLine($"        TURBOLINK_TO_GRPC(&item.Value, &value);");
-                        var keyExpr = ConvertFieldFromTurboLinkToGrpc(mapField.KeyField, "item.Key", CommentTagDefine.MapFKey, field);
+                        var keyExpr = ConvertFieldFromTurboLinkToGrpc(mapField.KeyField, "item.Key", CommentTagDefine.FMapKey, field);
                         sb.AppendLine($"        (*(out->mutable_{mapField.FieldGrpcName}()))[{keyExpr}] = value;");
                     }
                     else
                     {
-                        var keyExpr = ConvertFieldFromTurboLinkToGrpc(mapField.KeyField, "item.Key", CommentTagDefine.MapFKey, field);
-                        var valExpr = ConvertFieldFromTurboLinkToGrpc(mapField.ValueField, "item.Value", CommentTagDefine.MapFValue, field);
+                        var keyExpr = ConvertFieldFromTurboLinkToGrpc(mapField.KeyField, "item.Key", CommentTagDefine.FMapKey, field);
+                        var valExpr = ConvertFieldFromTurboLinkToGrpc(mapField.ValueField, "item.Value", CommentTagDefine.FMapValue, field);
                         sb.AppendLine($"        (*(out->mutable_{mapField.FieldGrpcName}()))[{keyExpr}] = {valExpr};");
                     }
 
@@ -285,7 +285,7 @@ namespace protoc_gen_turbolink.Template
                     }
                     else
                     {
-                        var valExpr = ConvertFieldFromTurboLinkToGrpc(field, "value", CommentTagDefine.ArrayFValue, field);
+                        var valExpr = ConvertFieldFromTurboLinkToGrpc(field, "value", CommentTagDefine.FArrayValue, field);
                         sb.AppendLine($"        out->add_{field.FieldGrpcName}({valExpr});");
                     }
                     sb.AppendLine("    }");
@@ -309,7 +309,7 @@ namespace protoc_gen_turbolink.Template
                         }
                         else
                         {
-                            var valExpr = ConvertFieldFromTurboLinkToGrpc(fieldOfOneofMessage, getField, CommentTagDefine.OneofFValue, field);
+                            var valExpr = ConvertFieldFromTurboLinkToGrpc(fieldOfOneofMessage, getField, CommentTagDefine.FOneofValue, field);
                             sb.AppendLine($"        out->set_{fieldOfOneofMessage.FieldGrpcName}({valExpr});");
                         }
 

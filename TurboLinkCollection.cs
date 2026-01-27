@@ -99,7 +99,7 @@ namespace protoc_gen_turbolink
 			get
 			{
 				// return "TArray<" + ItemField.FieldType + ">";
-				return "TArray<" + TurboLinkUtils.GetFieldType(ItemField.FieldDesc, FieldDesc, CommentTagDefine.ArrayFValue) + ">";
+				return "TArray<" + TurboLinkUtils.GetFieldType(ItemField.FieldDesc, FieldDesc, CommentTagDefine.FArrayValue) + ">";
 			}
 		}
 
@@ -108,7 +108,7 @@ namespace protoc_gen_turbolink
 			get
 			{
 				// return NeedNativeMake ? ("TArray<TSharedPtr<" + ItemField.FieldType + ">>") : FieldType;
-				return NeedNativeMake ? ("TArray<TSharedPtr<" + TurboLinkUtils.GetFieldType(ItemField.FieldDesc, FieldDesc, CommentTagDefine.ArrayFValue) + ">>") : FieldType;
+				return NeedNativeMake ? ("TArray<TSharedPtr<" + TurboLinkUtils.GetFieldType(ItemField.FieldDesc, FieldDesc, CommentTagDefine.FArrayValue) + ">>") : FieldType;
 			}
 		}
 	}
@@ -127,9 +127,9 @@ namespace protoc_gen_turbolink
 			{
 				// return "TMap<" + KeyField.FieldType + ", " + ValueField.FieldType + ">";
 				return "TMap<" 
-				       + TurboLinkUtils.GetFieldType(KeyField.FieldDesc, FieldDesc,  CommentTagDefine.MapFKey) 
+				       + TurboLinkUtils.GetFieldType(KeyField.FieldDesc, FieldDesc,  CommentTagDefine.FMapKey) 
 				       + ", " 
-				       + TurboLinkUtils.GetFieldType(ValueField.FieldDesc, FieldDesc,  CommentTagDefine.MapFValue)
+				       + TurboLinkUtils.GetFieldType(ValueField.FieldDesc, FieldDesc,  CommentTagDefine.FMapValue)
 				       + ">";
 			}
 		}
@@ -142,8 +142,8 @@ namespace protoc_gen_turbolink
 				// 	? ("TMap<" + KeyField.FieldType + ", TSharedPtr<" + ValueField.FieldType + ">>")
 				// 	: FieldType;
 				return NeedNativeMake
-					? ("TMap<" + TurboLinkUtils.GetFieldType(KeyField.FieldDesc, FieldDesc,  CommentTagDefine.MapFKey) 
-					           + ", TSharedPtr<" + TurboLinkUtils.GetFieldType(ValueField.FieldDesc, FieldDesc,  CommentTagDefine.MapFValue) + ">>")
+					? ("TMap<" + TurboLinkUtils.GetFieldType(KeyField.FieldDesc, FieldDesc,  CommentTagDefine.FMapKey) 
+					           + ", TSharedPtr<" + TurboLinkUtils.GetFieldType(ValueField.FieldDesc, FieldDesc,  CommentTagDefine.FMapValue) + ">>")
 					: FieldType;
 			}
 		}

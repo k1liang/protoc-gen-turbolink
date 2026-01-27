@@ -18,10 +18,10 @@ public static class CommentTagDefine
     public const string FName = "FName";
 
     public const string FValue = "FValue";
-    public const string MapFKey = "MapFKey";
-    public const string MapFValue = "MapFValue";
-    public const string ArrayFValue = "ArrayFValue";
-    public const string OneofFValue = "OneofFValue";
+    public const string FMapKey = "FMapKey";
+    public const string FMapValue = "FMapValue";
+    public const string FArrayValue = "FArrayValue";
+    public const string FOneofValue = "FOneofFValue";
 }
 
 public sealed class TagInfo
