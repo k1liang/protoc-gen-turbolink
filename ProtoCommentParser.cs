@@ -234,7 +234,7 @@ public sealed class ProtoCommentParser
             ? match.Groups[2].Value.Trim()
             : string.Empty;
 
-        var arr = info.Split(",");
+        var arr = tag == CommentTagDefine.AppendCode ? new string[]{info} :  info.Split(",");
         var ret = new List<TagInfo>();
         foreach (var tagInfo in arr)
         {
