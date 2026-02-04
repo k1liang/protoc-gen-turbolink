@@ -45,10 +45,10 @@ namespace protoc_gen_turbolink.Template
                 var msg = message;
                 if (message is GrpcMessage_Oneof)
                 {
-                    msg = (message as GrpcMessage_Oneof).ParentMessage;   
+                    msg = (message as GrpcMessage_Oneof).ParentMessage;
                 }
 
-                if(exportedMessages.Contains(msg)) continue;
+                if (exportedMessages.Contains(msg)) continue;
                 exportedMessages.Add(msg);
                 GenerateMessageMarshalingDefine(sb, msg);
                 sb.AppendLine();
@@ -73,7 +73,7 @@ namespace protoc_gen_turbolink.Template
             {
                 return $"StaticCast<{field.FieldType}>({getField})";
             }
-            
+
             return getField;
         }
 
@@ -97,12 +97,12 @@ namespace protoc_gen_turbolink.Template
             {
                 if (ProtoCommentParser.FindFieldMeta(field.FieldDesc, CommentTagDefine.RoundToFloat, out var v))
                 {
-                    if(v == "false") return getField;                    
+                    if (v == "false") return getField;
                 }
                 // 所有float都转
                 return $"FTurboLinkGrpcMessageUtil::RoundToFloat({getField})";
             }
-            
+
             return getField;
         }
 
@@ -113,7 +113,7 @@ namespace protoc_gen_turbolink.Template
                 // 不导出实现函数
                 if (v.ToLower() == "false") return;
             }
-            
+
             // ---------- GRPC_TO_TURBOLINK ----------
             sb.AppendLine($"void GRPC_TO_TURBOLINK(const ::{message.GrpcName}* in, {message.Name}* out)");
             sb.AppendLine("{");
@@ -325,18 +325,55 @@ namespace protoc_gen_turbolink.Template
                     }
                     else if (field.FieldDesc.Type == FieldDescriptorProto.Types.Type.Message)
                     {
-                        sb.AppendLine($"    TURBOLINK_TO_GRPC(&(in->{field.FieldName}), out->mutable_{field.FieldGrpcName}());");
+                        sb.AppendLine($"    if(!in->{field.FieldName}.IsEqualDefaultValue()) TURBOLINK_TO_GRPC(&(in->{field.FieldName}), out->mutable_{field.FieldGrpcName}());");
                     }
                     else
                     {
                         var getField = $"in->{field.FieldName}";
                         var valExpr = ConvertFieldFromTurboLinkToGrpc(field, getField);
-                        sb.AppendLine($"    out->{fieldsetName}({valExpr});");
+                        var checkExpr = ConvertFieldFromTurboLinkToGrpcLocalValueCheck(field, getField);
+                        sb.AppendLine($"    {checkExpr} out->{fieldsetName}({valExpr});");
                     }
                 }
             }
 
             sb.AppendLine("}");
+        }
+
+        private string ConvertFieldFromTurboLinkToGrpcLocalValueCheck(GrpcMessageField field, string getField, string tag = CommentTagDefine.FValue, GrpcMessageField fieldWithMeta = null)
+        {
+            switch(field.FieldDesc.Type)
+            {
+                case FieldDescriptorProto.Types.Type.Bool:
+                    return $"if({getField})";
+                case FieldDescriptorProto.Types.Type.Int32:
+                case FieldDescriptorProto.Types.Type.Int64:
+                case FieldDescriptorProto.Types.Type.Uint32:
+                case FieldDescriptorProto.Types.Type.Uint64:
+                    return $"if({getField} != 0)";
+                case FieldDescriptorProto.Types.Type.Double:
+                    return $"if(!FMath::IsNearlyEqual({getField}, 0.0, TL_DOUBLE_TOLERANCE))";
+                case FieldDescriptorProto.Types.Type.Float:
+                    return $"if(!FMath::IsNearlyEqual({getField}, 0.f, TL_FLOAT_TOLERANCE))";
+                case FieldDescriptorProto.Types.Type.Enum:
+                    return $"if((int){getField} != 0)";
+                case FieldDescriptorProto.Types.Type.String:
+                    var checkField = fieldWithMeta ?? field;
+                    var tempField = ProtoCommentParser.ProcessMetaString(checkField.FieldDesc, tag, getField);
+                    return $"if(!{tempField}.IsEmpty())";
+                case FieldDescriptorProto.Types.Type.Bytes:
+                    return $"if(!{getField}.Value.IsEmpty())";
+                case FieldDescriptorProto.Types.Type.Message:
+                    return $"if(!{getField}.IsEqualDefaultValue())";
+                case FieldDescriptorProto.Types.Type.Sfixed32:
+                case FieldDescriptorProto.Types.Type.Sfixed64:
+                case FieldDescriptorProto.Types.Type.Sint32:
+                case FieldDescriptorProto.Types.Type.Sint64:                    
+                case FieldDescriptorProto.Types.Type.Fixed32:
+                case FieldDescriptorProto.Types.Type.Fixed64:
+                    return $"if({getField} != 0)";
+            }
+            return "";
         }
     }
 }
