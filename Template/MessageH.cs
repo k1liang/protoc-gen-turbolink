@@ -110,7 +110,7 @@ namespace protoc_gen_turbolink.Template
                 if (message is GrpcMessage_Oneof oneof)
                 {
                     writer.WriteLine();
-                    writer.WriteLine("UPROPERTY(BlueprintReadWrite, Category = TurboLink)");
+                    writer.WriteLine($"UPROPERTY(BlueprintReadWrite, Category = TurboLink, Meta = (PBName=\"{oneof.OriginalDisplayName}\"))");
                     writer.WriteLine($"{oneof.OneofEnum.Name} {oneof.CamelName}Case{{}};");
                     // Console.WriteLine($"build oneof {oneof.OneofEnum.Name} {oneof.CamelName}");
                 }
@@ -136,7 +136,7 @@ namespace protoc_gen_turbolink.Template
                         bool enableBlueprintReadWrite = tagInfo == null || tagInfo.Info.ToLower() != "false";
                         if (enableBlueprintReadWrite)
                         {
-                            writer.WriteLine("UPROPERTY(BlueprintReadWrite, Category = TurboLink)");
+                            writer.WriteLine($"UPROPERTY(BlueprintReadWrite, Category = TurboLink, Meta = (PBName=\"{field.FieldDesc?.Name}\"))");
                         }
                         else
                         {
