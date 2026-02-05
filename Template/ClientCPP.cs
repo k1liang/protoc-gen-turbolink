@@ -96,8 +96,8 @@ namespace protoc_gen_turbolink.Template
             writer.Indent++;
             writer.WriteLine($"context{method.Name}->RpcContext->AddMetadata(");
             writer.Indent++;
-            writer.WriteLine("(const char*)StringCast<UTF8CHAR>(*(metaDataPair.Key)).Get(),");
-            writer.WriteLine("(const char*)StringCast<UTF8CHAR>(*(metaDataPair.Value)).Get()");
+            writer.WriteLine("TCHAR_TO_UTF8(*(metaDataPair.Key)),");
+            writer.WriteLine("TCHAR_TO_UTF8(*(metaDataPair.Value))");
             writer.Indent--;
             writer.WriteLine(");");
             writer.Indent--;

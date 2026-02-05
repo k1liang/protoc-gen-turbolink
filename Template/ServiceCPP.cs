@@ -98,7 +98,7 @@ namespace protoc_gen_turbolink.Template
             writer.WriteLine();
             writer.WriteLine("if (d->Channel == nullptr) {");
             writer.Indent++;
-            writer.WriteLine("d->Channel = TurboLinkManager->d->CreateServiceChannel((const char*)StringCast<UTF8CHAR>(*serviceEndPoint).Get(), this);");
+            writer.WriteLine("d->Channel = TurboLinkManager->d->CreateServiceChannel(TCHAR_TO_UTF8(*serviceEndPoint), this);");
             writer.Indent--;
             writer.WriteLine("}");
             writer.WriteLine();

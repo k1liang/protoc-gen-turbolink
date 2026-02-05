@@ -83,7 +83,7 @@ namespace protoc_gen_turbolink.Template
             {
                 var checkField = fieldWithMeta ?? field;
                 var tempField = ProtoCommentParser.ProcessMetaString(checkField.FieldDesc, tag, getField);
-                return $"(const char*)StringCast<UTF8CHAR>(*({tempField})).Get()";
+                return $"TCHAR_TO_UTF8(*({tempField}))";
             }
             else if (field.FieldDesc.Type == FieldDescriptorProto.Types.Type.Bytes)
             {
@@ -358,9 +358,22 @@ namespace protoc_gen_turbolink.Template
                 case FieldDescriptorProto.Types.Type.Enum:
                     return $"if((int){getField} != 0)";
                 case FieldDescriptorProto.Types.Type.String:
-                    var checkField = fieldWithMeta ?? field;
-                    var tempField = ProtoCommentParser.ProcessMetaString(checkField.FieldDesc, tag, getField);
-                    return $"if(!{tempField}.IsEmpty())";
+                    {
+                        var checkField = fieldWithMeta ?? field;
+                        if (ProtoCommentParser.FindFieldMetaArray(checkField.FieldDesc, tag, out var infoList))
+                        {
+                            foreach (var tagInfo in infoList)
+                            {
+                                if (tagInfo == CommentTagDefine.FName) 
+                                {
+                                    return $"if(!{getField}.IsNone())";                                    
+                                }                                
+                            }
+                        }
+                        
+                        var tempField = ProtoCommentParser.ProcessMetaString(checkField.FieldDesc, tag, getField);
+                        return $"if(!{tempField}.IsEmpty())";
+                    }
                 case FieldDescriptorProto.Types.Type.Bytes:
                     return $"if(!{getField}.Value.IsEmpty())";
                 case FieldDescriptorProto.Types.Type.Message:
