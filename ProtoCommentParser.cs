@@ -197,7 +197,7 @@ public sealed class ProtoCommentParser
                         Descriptor = target.Field
                     };
                     msgInfo.Fields.Add(target.Field, fieldInfo);
-                    GlobalFieldInfos.Add(target.Field, fieldInfo);
+                    GlobalFieldInfos[target.Field] = fieldInfo;
                 }
 
                 fieldInfo.TagInfos = fieldInfo.TagInfos.Concat(tagInfo).ToList();
