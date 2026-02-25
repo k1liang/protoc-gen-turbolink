@@ -64,6 +64,13 @@ namespace protoc_gen_turbolink.Template
 
                     if(exportedMessages.Contains(msg)) continue;
                     exportedMessages.Add(msg);
+
+                    // var pbClassInNamespace = GeneratePBClassInNameSpace(msg);
+                    // if (!string.IsNullOrEmpty(pbClassInNamespace))
+                    // {
+                    //     writer.WriteLine(pbClassInNamespace);
+                    // }
+
                     writer.WriteLine($"void GRPC_TO_TURBOLINK(const ::{msg.GrpcName}* in, {msg.Name}* out);");
                     writer.WriteLine($"void TURBOLINK_TO_GRPC(const {msg.Name}* in, ::{msg.GrpcName}* out);");
                     writer.WriteLine();
@@ -83,6 +90,23 @@ namespace protoc_gen_turbolink.Template
 
                 return sw.ToString();
             }
+        }
+
+        private string GeneratePBClassInNameSpace(GrpcMessage msg)
+        {
+            var ret = "";
+            var namespaces = msg.ServiceFile.GrpcPackageName.Split("::");
+            for (int i = 0; i < namespaces.Length; i++)
+            {
+                ret += $"namespace {namespaces[i]} {{";
+            }
+            var parentMessagePrefix = msg.ParentMessageNameList.Length > 0 ? string.Join("_", msg.ParentMessageNameList) + "_" : "";            
+            ret += $"class {parentMessagePrefix}{msg.MessageDesc.Name};";
+            for (int i = 0; i < namespaces.Length; i++)
+            {
+                ret += "}";
+            }
+            return ret;
         }
 
         /// <summary>

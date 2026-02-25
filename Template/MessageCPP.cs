@@ -48,7 +48,7 @@ namespace protoc_gen_turbolink.Template
                         if(exportedMessages.Contains(msg)) continue;
                         exportedMessages.Add(msg);
                         {
-                            writer.WriteLine($"DEFINE_PB_DEFAULT_FUNCTIONS({msg.Name}, ::{msg.GrpcName})");
+                            writer.WriteLine($"DEFINE_TL_DEFAULT_FUNCTIONS({msg.Name}, ::{msg.GrpcName})");
                         }
                     }
                 }

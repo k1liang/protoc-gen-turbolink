@@ -99,13 +99,13 @@ namespace protoc_gen_turbolink.Template
                     writer.WriteLine($"USTRUCT(BlueprintType, meta = (DisplayName=\"{message.OriginalDisplayName}\"))");
                 }
 
-                writer.WriteLine($"struct {g.ExportPrefix} {message.Name} : public FPBMessage");
+                writer.WriteLine($"struct {g.ExportPrefix} {message.Name} : public FTLMessage");
                 writer.WriteLine("{");
                 writer.Indent++;
                 writer.WriteLine("GENERATED_BODY()");
                 
                 if (g.GenerateDefaultFunctionCode && message is not GrpcMessage_Oneof)
-                    writer.WriteLine("DECLARE_PB_DEFAULT_FUNCTIONS()");
+                    writer.WriteLine("DECLARE_TL_DEFAULT_FUNCTIONS()");
 
                 if (message is GrpcMessage_Oneof oneof)
                 {
