@@ -9,6 +9,7 @@ using Google.Protobuf.Compiler;
 using Google.Protobuf.Reflection;
 using Google.Protobuf.Collections;
 using System.Data;
+using System.Text.RegularExpressions;
 
 namespace protoc_gen_turbolink
 {
@@ -436,6 +437,63 @@ namespace protoc_gen_turbolink
 				ParseComments(protoFileName);
 			}
 
+			// step 8: PODConfig is deliberately narrow. Reject unsupported schemas in the
+			// generator instead of emitting a config which only looks trivially copyable.
+			if (!ValidatePODConfigs(out error))
+			{
+				return false;
+			}
+
+			return true;
+		}
+
+		private bool ValidatePODConfigs(out string error)
+		{
+			error = null;
+			var usedConfigNames = new HashSet<string>();
+			foreach (GrpcServiceFile serviceFile in GrpcServiceFiles.Values)
+			{
+				foreach (GrpcMessage message in serviceFile.MessageArray)
+				{
+					if (message.MessageDesc == null ||
+					    !ProtoCommentParser.FindMessageMeta(message.MessageDesc, CommentTagDefine.PODConfig, out var configName))
+					{
+						continue;
+					}
+
+					if (string.IsNullOrWhiteSpace(configName) ||
+					    !Regex.IsMatch(configName, @"^[A-Za-z_][A-Za-z0-9_]*$"))
+					{
+						error = $"PODConfig on {message.OriginalDisplayName} requires a valid unqualified C++ identifier";
+						return false;
+					}
+					if (!usedConfigNames.Add(configName))
+					{
+						error = $"duplicate PODConfig C++ name: {configName}";
+						return false;
+					}
+
+					foreach (FieldDescriptorProto field in message.MessageDesc.Field)
+					{
+						if (field.Label == FieldDescriptorProto.Types.Label.Repeated ||
+						    field.HasOneofIndex ||
+						    !TurboLinkUtils.TryGetPODFieldType(field, out _))
+						{
+							error = $"PODConfig {configName} field {field.Name} must be a singular numeric/bool scalar";
+							return false;
+						}
+					}
+
+					int oneofReferenceCount = serviceFile.MessageArray
+						.OfType<GrpcMessage_Oneof>()
+						.Sum(oneof => oneof.Fields.Count(field => field.FieldType == message.Name));
+					if (oneofReferenceCount != 1)
+					{
+						error = $"PODConfig {configName} must be referenced by exactly one oneof arm in the same proto file";
+						return false;
+					}
+				}
+			}
 			return true;
 		}
 		private void AddDependencyFiles(string protoFileName)
@@ -659,10 +717,160 @@ namespace protoc_gen_turbolink
 		{
 			var serviceFile = GrpcServiceFiles[protoFileName];
 			RebuildMessageIndices(serviceFile);
-			
+
+			// Break reference cycles (recursive / mutually-recursive messages) before ordering.
+			// UE USTRUCTs are value types and must be defined before use, so the reorder below can
+			// never converge on a cycle. For each cycle we wrap one field in TSharedPtr (NeedNativeMake);
+			// a pointer needs only a forward declaration, which removes that field's ordering constraint.
+			BreakMessageCycles(serviceFile);
+
+			// Reorder so every by-value message dependency is defined before its user.
+			// NeedNativeMake fields are skipped now, so the remaining graph is acyclic and this terminates.
 			while (!AnalyzeMessageImp(serviceFile))
 			{
 			}
+		}
+
+		// Resolve the same-file message a field references (used for both ordering and cycle analysis).
+		// Returns false when the field does not reference a message defined in THIS file (scalars and
+		// cross-file references are always fully included, so they impose no local constraint).
+		// cuttable = the field may be wrapped in TSharedPtr (NeedNativeMake) to break a cycle; a oneof
+		// union pointer is stored inline in its parent and therefore must never be cut.
+		private bool TryGetFieldTarget(GrpcServiceFile serviceFile, GrpcMessageField field, out int index, out bool cuttable)
+		{
+			index = -1;
+			cuttable = false;
+
+			if (field is GrpcMessageField_Oneof oneofField)
+			{
+				index = serviceFile.MessageArray.IndexOf(oneofField.OneofMessage);
+				cuttable = false;
+				return index >= 0;
+			}
+
+			string typeName = field.FieldDesc?.TypeName;
+			if (field is GrpcMessageField_Map mapField)
+			{
+				typeName = mapField.ValueField.FieldDesc.TypeName;
+			}
+
+			if (typeName != null && serviceFile.Message2IndexMap.TryGetValue(typeName, out index))
+			{
+				cuttable = true; //single / repeated / map-value referencing a same-file message
+				return true;
+			}
+			index = -1;
+			return false;
+		}
+
+		private class MessageEdge
+		{
+			public GrpcMessage Owner;
+			public GrpcMessageField Field;
+			public bool Cuttable;
+		}
+
+		// Iteratively find one reference cycle and cut a single cuttable edge on it, until acyclic.
+		// Preference: cut a repeated/map edge (element-wise, always safe) over a single edge; among
+		// equals, cut the deepest (the actual recursion back-edge) so the wrapping stays localized.
+		private void BreakMessageCycles(GrpcServiceFile serviceFile)
+		{
+			int guard = 0;
+			int maxIterations = 16;
+			foreach (var m in serviceFile.MessageArray) maxIterations += (m.Fields?.Count ?? 0) + 1;
+
+			while (true)
+			{
+				var cycle = FindOneCycle(serviceFile);
+				if (cycle == null) break;
+
+				MessageEdge best = null;
+				int bestScore = int.MinValue;
+				for (int i = 0; i < cycle.Count; i++)
+				{
+					var e = cycle[i];
+					if (!e.Cuttable) continue;
+					int kind = (e.Field is GrpcMessageField_Repeated || e.Field is GrpcMessageField_Map) ? 1 : 0;
+					int score = kind * 100000 + i; //deeper edge (larger i) wins ties
+					if (score > bestScore)
+					{
+						bestScore = score;
+						best = e;
+					}
+				}
+
+				if (best == null)
+				{
+					//A cycle with no cuttable edge (only inline oneof unions) is malformed and cannot be
+					//broken by wrapping; bail out rather than spin forever.
+					Console.Error.WriteLine($"[turbolink] WARNING: uncuttable message cycle in {serviceFile.FileName}; struct ordering may be incomplete.");
+					break;
+				}
+
+				best.Field.NeedNativeMake = true;
+				best.Owner.HasNativeMake = true;
+
+				if (++guard > maxIterations)
+				{
+					Console.Error.WriteLine($"[turbolink] WARNING: cycle-breaking exceeded iteration bound in {serviceFile.FileName}.");
+					break;
+				}
+			}
+		}
+
+		// DFS for a single directed cycle over non-cut message edges. Returns the edges forming the
+		// cycle in path order (entry node -> ... -> back-edge), or null when the graph is acyclic.
+		private List<MessageEdge> FindOneCycle(GrpcServiceFile serviceFile)
+		{
+			int n = serviceFile.MessageArray.Count;
+			int[] state = new int[n]; //0=white, 1=gray(on stack), 2=black
+			var nodeStack = new List<int>();
+			var edgeStack = new List<MessageEdge>();
+			List<MessageEdge> result = null;
+
+			bool Visit(int u)
+			{
+				state[u] = 1;
+				nodeStack.Add(u);
+
+				var owner = serviceFile.MessageArray[u];
+				if (owner.Fields != null)
+				{
+					foreach (var field in owner.Fields)
+					{
+						if (field.NeedNativeMake) continue; //already cut
+						if (!TryGetFieldTarget(serviceFile, field, out int v, out bool cuttable)) continue;
+						if (v < 0 || v >= n) continue;
+
+						var edge = new MessageEdge { Owner = owner, Field = field, Cuttable = cuttable };
+						if (state[v] == 1)
+						{
+							//back edge closing a cycle: slice the path from where v entered the stack
+							int k = nodeStack.IndexOf(v);
+							result = new List<MessageEdge>();
+							for (int i = k; i < edgeStack.Count; i++) result.Add(edgeStack[i]);
+							result.Add(edge);
+							return true;
+						}
+						if (state[v] == 0)
+						{
+							edgeStack.Add(edge);
+							if (Visit(v)) return true;
+							edgeStack.RemoveAt(edgeStack.Count - 1);
+						}
+					}
+				}
+
+				state[u] = 2;
+				nodeStack.RemoveAt(nodeStack.Count - 1);
+				return false;
+			}
+
+			for (int i = 0; i < n; i++)
+			{
+				if (state[i] == 0 && Visit(i)) return result;
+			}
+			return null;
 		}
 
 		private string GetMessageName(GrpcServiceFile serviceFile, GrpcMessage tmp, string Name)
@@ -694,55 +902,22 @@ namespace protoc_gen_turbolink
 			{
 				foreach(GrpcMessageField messageField in message.Fields)
 				{
-					// if (messageField.FieldDesc==null || //Oneof message field
-					// 	messageField.FieldDesc.Type != FieldDescriptorProto.Types.Type.Message) continue;
-					string typeName = "";
-					int foundIndex = -1;
-					if (messageField.FieldDesc == null)
-					{
-						//Oneof message field
-						if (messageField is GrpcMessageField_Oneof)
-						{
-							GrpcMessageField_Oneof oneofMessageField = (GrpcMessageField_Oneof)messageField;
-							foundIndex = serviceFile.MessageArray.IndexOf(oneofMessageField.OneofMessage);
-						}
-						else
-						{
-							continue;
-						}
-					}
+					//NeedNativeMake fields are TSharedPtr (forward-decl only): no ordering constraint,
+					//and honoring them would reintroduce the cycle that BreakMessageCycles just cut.
+					if (messageField.NeedNativeMake) continue;
 
-					if (typeName.Length == 0)
-					{
-						typeName = messageField.FieldDesc?.TypeName;
-					}
+					if (!TryGetFieldTarget(serviceFile, messageField, out int index, out _)) continue;
 
-					if (messageField is GrpcMessageField_Map)
+					if(index >= message.Index)
 					{
-						//for map field, pick value field name, eg. "map<string, Address>" => "Address"
-						GrpcMessageField_Map mapMessageField = (GrpcMessageField_Map)messageField;
-						typeName = mapMessageField.ValueField.FieldDesc.TypeName;
-					}
+						// move the dependency in front of its user, then re-sort
+						var msg = serviceFile.MessageArray[index];
+						serviceFile.MessageArray.RemoveAt(index);
+						serviceFile.MessageArray.Insert(message.Index, msg);
 
-					// Console.WriteLine($"type name: {typeName}");
-					if ((foundIndex >= 0) || (typeName != null && serviceFile.Message2IndexMap.ContainsKey(typeName)))
-					{
-						int index = foundIndex >= 0 ? foundIndex: serviceFile.Message2IndexMap[typeName];
-						if(index >= message.Index)
-						{
-							// 记录插入位置和消息，以便后续处理
-							// messageField.NeedNativeMake = true;
-							// message.HasNativeMake = true;
-							
-							// 插入新位置，然后重新排序
-							var msg = serviceFile.MessageArray[index];
-							serviceFile.MessageArray.RemoveAt(index);
-							serviceFile.MessageArray.Insert(message.Index, msg);
-							
-							// rebuild message index map
-							RebuildMessageIndices(serviceFile);
-							return false;
-						}
+						// rebuild message index map
+						RebuildMessageIndices(serviceFile);
+						return false;
 					}
 				}
 			}

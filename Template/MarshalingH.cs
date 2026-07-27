@@ -71,8 +71,8 @@ namespace protoc_gen_turbolink.Template
                     //     writer.WriteLine(pbClassInNamespace);
                     // }
 
-                    writer.WriteLine($"void GRPC_TO_TURBOLINK(const ::{msg.GrpcName}* in, {msg.Name}* out);");
-                    writer.WriteLine($"void TURBOLINK_TO_GRPC(const {msg.Name}* in, ::{msg.GrpcName}* out);");
+                    writer.WriteLine($"void {g.ExportPrefix} GRPC_TO_TURBOLINK(const ::{msg.GrpcName}* in, {msg.Name}* out);");
+                    writer.WriteLine($"void {g.ExportPrefix} TURBOLINK_TO_GRPC(const {msg.Name}* in, ::{msg.GrpcName}* out);");
                     writer.WriteLine();
                 }
 

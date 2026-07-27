@@ -16,6 +16,9 @@ public static class CommentTagDefine
     public const string RoundToFloat = "RoundToFloat";
     public const string LowerString = "LowerString";
     public const string FName = "FName";
+    // Generate a trivially-copyable C++ config struct plus Decode/Encode overloads.
+    // Message-level syntax: // meta(PODConfig): FMyRuntimeConfig
+    public const string PODConfig = "PODConfig";
 
     public const string FValue = "FValue";
     public const string FMapKey = "FMapKey";

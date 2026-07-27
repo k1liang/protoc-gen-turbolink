@@ -214,6 +214,9 @@ namespace protoc_gen_turbolink.Template
                 {
                     if (field.NeedNativeMake)
                     {
+                        //only materialize the pointer when the message is actually present, so an unset
+                        //optional round-trips as null instead of a default-constructed instance
+                        sb.AppendLine($"    if(in->has_{field.FieldGrpcName}())");
                         sb.AppendLine("    {");
                         sb.AppendLine($"        {field.FieldType} field;");
                         sb.AppendLine($"        GRPC_TO_TURBOLINK(&(in->{field.FieldGrpcName}()), &field);");
@@ -321,7 +324,7 @@ namespace protoc_gen_turbolink.Template
                 {
                     if (field.NeedNativeMake)
                     {
-                        sb.AppendLine($"    TURBOLINK_TO_GRPC(in->{field.FieldName}.Get(), out->mutable_{field.FieldGrpcName}());");
+                        sb.AppendLine($"    if(in->{field.FieldName}.IsValid()) TURBOLINK_TO_GRPC(in->{field.FieldName}.Get(), out->mutable_{field.FieldGrpcName}());");
                     }
                     else if (field.FieldDesc.Type == FieldDescriptorProto.Types.Type.Message)
                     {

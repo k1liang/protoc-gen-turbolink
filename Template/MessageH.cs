@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.CodeDom.Compiler;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 
 namespace protoc_gen_turbolink.Template
@@ -47,6 +48,12 @@ namespace protoc_gen_turbolink.Template
                 // 渲染 Structs
                 GenerateStructs(writer);
 
+                // Keep FGrpc wrapper names behind a native-protobuf type trait.
+                GenerateMessageTraits(writer);
+
+                // Generate scalar-only runtime configs after every FGrpc type is complete.
+                GeneratePODConfigs(writer);
+
                 // 渲染 Helper Libraries
                 if (g.GenerateBPHelper)
                 {
@@ -54,6 +61,115 @@ namespace protoc_gen_turbolink.Template
                 }
 
                 return sw.ToString();
+            }
+        }
+
+        private void GenerateMessageTraits(IndentedTextWriter writer)
+        {
+            foreach (var message in s.MessageArray.Where(message => message.MessageDesc != null))
+            {
+                writer.WriteLine();
+                writer.WriteLine("template <>");
+                writer.WriteLine($"struct TTurboLinkMessageTraits<::{message.GrpcName}>");
+                writer.WriteLine("{");
+                writer.Indent++;
+                writer.WriteLine($"using FGrpcType = {message.Name};");
+                writer.Indent--;
+                writer.WriteLine("};");
+            }
+        }
+
+        private void GeneratePODConfigs(IndentedTextWriter writer)
+        {
+            foreach (var message in s.MessageArray)
+            {
+                if (message.MessageDesc == null ||
+                    !ProtoCommentParser.FindMessageMeta(message.MessageDesc, CommentTagDefine.PODConfig, out var configName))
+                {
+                    continue;
+                }
+
+                writer.WriteLine();
+                writer.WriteLine($"// PODConfig generated from {message.OriginalDisplayName}; edit the proto, not this struct.");
+                writer.WriteLine($"struct {configName}");
+                writer.WriteLine("{");
+                writer.Indent++;
+                foreach (var field in message.Fields)
+                {
+                    TurboLinkUtils.TryGetPODFieldType(field.FieldDesc, out var fieldType);
+                    writer.WriteLine($"{fieldType} {field.FieldName}{{}};");
+                }
+                writer.Indent--;
+                writer.WriteLine("};");
+
+                writer.WriteLine();
+                writer.WriteLine($"inline void TurboLinkDecodePODConfig(const {message.Name}& In, {configName}& Out)");
+                writer.WriteLine("{");
+                writer.Indent++;
+                foreach (var field in message.Fields)
+                {
+                    writer.WriteLine($"Out.{field.FieldName} = In.{field.FieldName};");
+                }
+                writer.Indent--;
+                writer.WriteLine("}");
+
+                writer.WriteLine();
+                writer.WriteLine($"inline void TurboLinkEncodePODConfig(const {configName}& In, {message.Name}& Out)");
+                writer.WriteLine("{");
+                writer.Indent++;
+                foreach (var field in message.Fields)
+                {
+                    writer.WriteLine($"Out.{field.FieldName} = In.{field.FieldName};");
+                }
+                writer.Indent--;
+                writer.WriteLine("}");
+
+                var oneofReferences = s.MessageArray
+                    .OfType<GrpcMessage_Oneof>()
+                    .SelectMany(oneof => oneof.Fields
+                        .Where(field => field.FieldType == message.Name)
+                        .Select(arm => (Oneof: oneof, Arm: arm)))
+                    .ToArray();
+
+                foreach (var reference in oneofReferences)
+                {
+                    var oneof = reference.Oneof;
+                    var arm = reference.Arm;
+                    writer.WriteLine();
+                    writer.WriteLine($"inline bool TurboLinkDecodePODConfig(const {oneof.ParentMessage.Name}& In, {configName}& Out)");
+                    writer.WriteLine("{");
+                    writer.Indent++;
+                    writer.WriteLine($"if (In.{oneof.CamelName}.{oneof.CamelName}Case != {oneof.OneofEnum.Name}::{arm.FieldName})");
+                    writer.WriteLine("{");
+                    writer.Indent++;
+                    writer.WriteLine("return false;");
+                    writer.Indent--;
+                    writer.WriteLine("}");
+                    writer.WriteLine($"TurboLinkDecodePODConfig(In.{oneof.CamelName}.{arm.FieldName}, Out);");
+                    writer.WriteLine("return true;");
+                    writer.Indent--;
+                    writer.WriteLine("}");
+
+                    writer.WriteLine();
+                    writer.WriteLine($"inline void TurboLinkEncodePODConfig(const {configName}& In, {oneof.ParentMessage.Name}& Out)");
+                    writer.WriteLine("{");
+                    writer.Indent++;
+                    writer.WriteLine($"Out.{oneof.CamelName}.{oneof.CamelName}Case = {oneof.OneofEnum.Name}::{arm.FieldName};");
+                    writer.WriteLine($"TurboLinkEncodePODConfig(In, Out.{oneof.CamelName}.{arm.FieldName});");
+                    writer.Indent--;
+                    writer.WriteLine("}");
+                }
+
+                var owningOneof = oneofReferences.Single().Oneof;
+                writer.WriteLine();
+                writer.WriteLine("template <>");
+                writer.WriteLine($"struct TTurboLinkPODConfigTraits<::{message.GrpcName}>");
+                writer.WriteLine("{");
+                writer.Indent++;
+                writer.WriteLine($"using ConfigType = {configName};");
+                writer.WriteLine($"using ProtoUnionType = ::{owningOneof.ParentMessage.GrpcName};");
+                writer.Indent--;
+                writer.WriteLine("};");
             }
         }
 
@@ -81,6 +197,27 @@ namespace protoc_gen_turbolink.Template
 
         private void GenerateStructs(IndentedTextWriter writer)
         {
+            // When cycle-breaking wrapped any field in TSharedPtr, the referenced struct may be defined
+            // later in this file. Emit forward declarations for every struct so those pointers resolve.
+            bool needForwardDecl = false;
+            foreach (var message in s.MessageArray)
+            {
+                if (message.HasNativeMake) { needForwardDecl = true; break; }
+                foreach (var field in message.Fields)
+                {
+                    if (field.NeedNativeMake) { needForwardDecl = true; break; }
+                }
+                if (needForwardDecl) break;
+            }
+            if (needForwardDecl)
+            {
+                writer.WriteLine();
+                foreach (var message in s.MessageArray)
+                {
+                    writer.WriteLine($"struct {message.Name};");
+                }
+            }
+
             foreach (var message in s.MessageArray)
             {
                 writer.WriteLine();

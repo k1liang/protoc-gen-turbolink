@@ -96,6 +96,34 @@ namespace protoc_gen_turbolink
             }
             return ueType;
         }
+        public static bool TryGetPODFieldType(FieldDescriptorProto field, out string cppType)
+        {
+            cppType = null;
+            switch (field.Type)
+            {
+                case FieldDescriptorProto.Types.Type.Double:
+                    cppType = "double"; break;
+                case FieldDescriptorProto.Types.Type.Float:
+                    cppType = "float"; break;
+                case FieldDescriptorProto.Types.Type.Int64:
+                case FieldDescriptorProto.Types.Type.Sfixed64:
+                case FieldDescriptorProto.Types.Type.Sint64:
+                    cppType = "int64"; break;
+                case FieldDescriptorProto.Types.Type.Uint64:
+                case FieldDescriptorProto.Types.Type.Fixed64:
+                    cppType = "uint64"; break;
+                case FieldDescriptorProto.Types.Type.Int32:
+                case FieldDescriptorProto.Types.Type.Sfixed32:
+                case FieldDescriptorProto.Types.Type.Sint32:
+                    cppType = "int32"; break;
+                case FieldDescriptorProto.Types.Type.Fixed32:
+                case FieldDescriptorProto.Types.Type.Uint32:
+                    cppType = "uint32"; break;
+                case FieldDescriptorProto.Types.Type.Bool:
+                    cppType = "bool"; break;
+            }
+            return cppType != null;
+        }
         public static string GetMessageFieldName(FieldDescriptorProto field)
         {
             //convert json name first letter to upper
