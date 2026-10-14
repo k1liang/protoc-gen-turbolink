@@ -51,7 +51,8 @@ namespace protoc_gen_turbolink.Template
                 // Keep FGrpc wrapper names behind a native-protobuf type trait.
                 GenerateMessageTraits(writer);
 
-                // Generate scalar-only runtime configs after every FGrpc type is complete.
+                // Generate fixed-header runtime configs (with an optional protobuf payload)
+                // after every FGrpc type is complete.
                 GeneratePODConfigs(writer);
 
                 // 渲染 Helper Libraries
@@ -89,38 +90,125 @@ namespace protoc_gen_turbolink.Template
                     continue;
                 }
 
+                var directFields = message.Fields.Where(IsDirectPODConfigField).ToArray();
+                bool hasComplexFields = directFields.Length != message.Fields.Count;
+
                 writer.WriteLine();
                 writer.WriteLine($"// PODConfig generated from {message.OriginalDisplayName}; edit the proto, not this struct.");
+                if (hasComplexFields)
+                {
+                    writer.WriteLine("// Complex fields live in the same config block as a deterministic protobuf payload.");
+                }
                 writer.WriteLine($"struct {configName}");
                 writer.WriteLine("{");
                 writer.Indent++;
-                foreach (var field in message.Fields)
+                foreach (var field in directFields)
                 {
                     TurboLinkUtils.TryGetPODFieldType(field.FieldDesc, out var fieldType);
                     writer.WriteLine($"{fieldType} {field.FieldName}{{}};");
                 }
+                if (hasComplexFields)
+                {
+                    writer.WriteLine("uint32 ConfigBlockSize{};");
+                    writer.WriteLine("FTurboLinkPODConfigSpan ProtoPayload{};");
+                    writer.WriteLine();
+                    writer.WriteLine($"bool DecodeProtoMessage(const FTurboLinkPODConfigView& View, {message.Name}& Out) const");
+                    writer.WriteLine("{");
+                    writer.Indent++;
+                    writer.WriteLine(
+                        $"return ConfigBlockSize == View.GetSize() && ProtoPayload.Offset >= sizeof({configName})");
+                    writer.WriteLine("    && View.DecodeMessage(ProtoPayload, Out);");
+                    writer.Indent--;
+                    writer.WriteLine("}");
+                }
                 writer.Indent--;
                 writer.WriteLine("};");
 
+                // Preserve the original fixed-size helpers for scalar-only configs and callers that do
+                // not need a block builder. Complex configs deliberately expose only the block codec.
+                if (!hasComplexFields)
+                {
+                    writer.WriteLine();
+                    writer.WriteLine($"inline void TurboLinkDecodePODConfig(const {message.Name}& In, {configName}& Out)");
+                    writer.WriteLine("{");
+                    writer.Indent++;
+                    foreach (var field in directFields)
+                    {
+                        WritePODConfigDecodeAssignment(writer, field, "In", "Out");
+                    }
+                    writer.Indent--;
+                    writer.WriteLine("}");
+
+                    writer.WriteLine();
+                    writer.WriteLine($"inline void TurboLinkEncodePODConfig(const {configName}& In, {message.Name}& Out)");
+                    writer.WriteLine("{");
+                    writer.Indent++;
+                    foreach (var field in directFields)
+                    {
+                        WritePODConfigEncodeAssignment(writer, field, "In", "Out");
+                    }
+                    writer.Indent--;
+                    writer.WriteLine("}");
+                }
+
                 writer.WriteLine();
-                writer.WriteLine($"inline void TurboLinkDecodePODConfig(const {message.Name}& In, {configName}& Out)");
+                writer.WriteLine($"inline bool TurboLinkDecodePODConfig(");
+                writer.Indent++;
+                writer.WriteLine($"const {message.Name}& In,");
+                writer.WriteLine($"{configName}& Out,");
+                writer.WriteLine("FTurboLinkPODConfigBuilder& Builder)");
+                writer.Indent--;
                 writer.WriteLine("{");
                 writer.Indent++;
-                foreach (var field in message.Fields)
+                if (hasComplexFields)
                 {
-                    writer.WriteLine($"Out.{field.FieldName} = In.{field.FieldName};");
+                    writer.WriteLine("if (!Builder.AppendMessage(In, Out.ProtoPayload))");
+                    writer.WriteLine("{");
+                    writer.Indent++;
+                    writer.WriteLine("return false;");
+                    writer.Indent--;
+                    writer.WriteLine("}");
+                    writer.WriteLine("Out.ConfigBlockSize = Builder.GetSize();");
+                    foreach (var field in directFields)
+                    {
+                        WritePODConfigDecodeAssignment(writer, field, "In", "Out");
+                    }
                 }
+                else
+                {
+                    writer.WriteLine("TurboLinkDecodePODConfig(In, Out);");
+                }
+                writer.WriteLine("return true;");
                 writer.Indent--;
                 writer.WriteLine("}");
 
                 writer.WriteLine();
-                writer.WriteLine($"inline void TurboLinkEncodePODConfig(const {configName}& In, {message.Name}& Out)");
+                writer.WriteLine($"inline bool TurboLinkEncodePODConfig(");
+                writer.Indent++;
+                writer.WriteLine($"const {configName}& In,");
+                writer.WriteLine("const FTurboLinkPODConfigView& View,");
+                writer.WriteLine($"{message.Name}& Out)");
+                writer.Indent--;
                 writer.WriteLine("{");
                 writer.Indent++;
-                foreach (var field in message.Fields)
+                if (hasComplexFields)
                 {
-                    writer.WriteLine($"Out.{field.FieldName} = In.{field.FieldName};");
+                    writer.WriteLine("if (!In.DecodeProtoMessage(View, Out))");
+                    writer.WriteLine("{");
+                    writer.Indent++;
+                    writer.WriteLine("return false;");
+                    writer.Indent--;
+                    writer.WriteLine("}");
+                    foreach (var field in directFields)
+                    {
+                        WritePODConfigEncodeAssignment(writer, field, "In", "Out");
+                    }
                 }
+                else
+                {
+                    writer.WriteLine("TurboLinkEncodePODConfig(In, Out);");
+                }
+                writer.WriteLine("return true;");
                 writer.Indent--;
                 writer.WriteLine("}");
 
@@ -136,7 +224,12 @@ namespace protoc_gen_turbolink.Template
                     var oneof = reference.Oneof;
                     var arm = reference.Arm;
                     writer.WriteLine();
-                    writer.WriteLine($"inline bool TurboLinkDecodePODConfig(const {oneof.ParentMessage.Name}& In, {configName}& Out)");
+                    writer.WriteLine($"inline bool TurboLinkDecodePODConfig(");
+                    writer.Indent++;
+                    writer.WriteLine($"const {oneof.ParentMessage.Name}& In,");
+                    writer.WriteLine($"{configName}& Out,");
+                    writer.WriteLine("FTurboLinkPODConfigBuilder& Builder)");
+                    writer.Indent--;
                     writer.WriteLine("{");
                     writer.Indent++;
                     writer.WriteLine($"if (In.{oneof.CamelName}.{oneof.CamelName}Case != {oneof.OneofEnum.Name}::{arm.FieldName})");
@@ -145,19 +238,50 @@ namespace protoc_gen_turbolink.Template
                     writer.WriteLine("return false;");
                     writer.Indent--;
                     writer.WriteLine("}");
-                    writer.WriteLine($"TurboLinkDecodePODConfig(In.{oneof.CamelName}.{arm.FieldName}, Out);");
-                    writer.WriteLine("return true;");
+                    writer.WriteLine($"return TurboLinkDecodePODConfig(In.{oneof.CamelName}.{arm.FieldName}, Out, Builder);");
                     writer.Indent--;
                     writer.WriteLine("}");
 
                     writer.WriteLine();
-                    writer.WriteLine($"inline void TurboLinkEncodePODConfig(const {configName}& In, {oneof.ParentMessage.Name}& Out)");
+                    writer.WriteLine($"inline bool TurboLinkEncodePODConfig(");
+                    writer.Indent++;
+                    writer.WriteLine($"const {configName}& In,");
+                    writer.WriteLine("const FTurboLinkPODConfigView& View,");
+                    writer.WriteLine($"{oneof.ParentMessage.Name}& Out)");
+                    writer.Indent--;
                     writer.WriteLine("{");
                     writer.Indent++;
                     writer.WriteLine($"Out.{oneof.CamelName}.{oneof.CamelName}Case = {oneof.OneofEnum.Name}::{arm.FieldName};");
-                    writer.WriteLine($"TurboLinkEncodePODConfig(In, Out.{oneof.CamelName}.{arm.FieldName});");
+                    writer.WriteLine($"return TurboLinkEncodePODConfig(In, View, Out.{oneof.CamelName}.{arm.FieldName});");
                     writer.Indent--;
                     writer.WriteLine("}");
+
+                    if (!hasComplexFields)
+                    {
+                        writer.WriteLine();
+                        writer.WriteLine($"inline bool TurboLinkDecodePODConfig(const {oneof.ParentMessage.Name}& In, {configName}& Out)");
+                        writer.WriteLine("{");
+                        writer.Indent++;
+                        writer.WriteLine($"if (In.{oneof.CamelName}.{oneof.CamelName}Case != {oneof.OneofEnum.Name}::{arm.FieldName})");
+                        writer.WriteLine("{");
+                        writer.Indent++;
+                        writer.WriteLine("return false;");
+                        writer.Indent--;
+                        writer.WriteLine("}");
+                        writer.WriteLine($"TurboLinkDecodePODConfig(In.{oneof.CamelName}.{arm.FieldName}, Out);");
+                        writer.WriteLine("return true;");
+                        writer.Indent--;
+                        writer.WriteLine("}");
+
+                        writer.WriteLine();
+                        writer.WriteLine($"inline void TurboLinkEncodePODConfig(const {configName}& In, {oneof.ParentMessage.Name}& Out)");
+                        writer.WriteLine("{");
+                        writer.Indent++;
+                        writer.WriteLine($"Out.{oneof.CamelName}.{oneof.CamelName}Case = {oneof.OneofEnum.Name}::{arm.FieldName};");
+                        writer.WriteLine($"TurboLinkEncodePODConfig(In, Out.{oneof.CamelName}.{arm.FieldName});");
+                        writer.Indent--;
+                        writer.WriteLine("}");
+                    }
                 }
 
                 var owningOneof = oneofReferences.Single().Oneof;
@@ -168,8 +292,52 @@ namespace protoc_gen_turbolink.Template
                 writer.Indent++;
                 writer.WriteLine($"using ConfigType = {configName};");
                 writer.WriteLine($"using ProtoUnionType = ::{owningOneof.ParentMessage.GrpcName};");
+                writer.WriteLine("static constexpr bool UsesConfigBuilderCodec = true;");
+                writer.WriteLine($"static constexpr bool AllowsTrailingConfigData = {(hasComplexFields ? "true" : "false")};");
                 writer.Indent--;
                 writer.WriteLine("};");
+            }
+        }
+
+        private static bool IsDirectPODConfigField(GrpcMessageField field)
+        {
+            return field is GrpcMessageField_Single
+                && field.FieldDesc != null
+                && !field.FieldDesc.HasOneofIndex
+                && TurboLinkUtils.TryGetPODFieldType(field.FieldDesc, out _);
+        }
+
+        private static void WritePODConfigDecodeAssignment(
+            IndentedTextWriter writer,
+            GrpcMessageField field,
+            string input,
+            string output)
+        {
+            if (field.FieldDesc.Type == Google.Protobuf.Reflection.FieldDescriptorProto.Types.Type.Enum)
+            {
+                writer.WriteLine(
+                    $"{output}.{field.FieldName} = static_cast<int32>({input}.{field.FieldName});");
+            }
+            else
+            {
+                writer.WriteLine($"{output}.{field.FieldName} = {input}.{field.FieldName};");
+            }
+        }
+
+        private static void WritePODConfigEncodeAssignment(
+            IndentedTextWriter writer,
+            GrpcMessageField field,
+            string input,
+            string output)
+        {
+            if (field.FieldDesc.Type == Google.Protobuf.Reflection.FieldDescriptorProto.Types.Type.Enum)
+            {
+                writer.WriteLine(
+                    $"{output}.{field.FieldName} = static_cast<{field.FieldType}>({input}.{field.FieldName});");
+            }
+            else
+            {
+                writer.WriteLine($"{output}.{field.FieldName} = {input}.{field.FieldName};");
             }
         }
 

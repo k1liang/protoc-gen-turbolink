@@ -45,9 +45,6 @@ namespace protoc_gen_turbolink
             //read request param
             bool dumpRequest = false;
             bool dumpCollection = false;
-            bool generateServiceCode = false;
-            bool generateJsonCode = true;
-            bool generateBPHelper = false;
             string removeOutputSubDir = "";
             
             GenerateParam generateParam = GenerateParam.Instance;
@@ -113,7 +110,10 @@ namespace protoc_gen_turbolink
             {
                 CodeGeneratorResponse.Types.File request_file = new CodeGeneratorResponse.Types.File();
                 request_file.Name = collection.InputFileNames + "request.json";
-                request_file.Content = JsonSerializer.Serialize(request, new JsonSerializerOptions { WriteIndented = true });
+                request_file.Content = JsonSerializer.Serialize(
+                    request,
+                    typeof(CodeGeneratorRequest),
+                    TurboLinkJsonContext.Default);
                 response.File.Add(request_file);
             }
 
@@ -122,7 +122,10 @@ namespace protoc_gen_turbolink
             {
                 CodeGeneratorResponse.Types.File service_collection = new CodeGeneratorResponse.Types.File();
                 service_collection.Name = collection.InputFileNames + "collection.json";
-                service_collection.Content = JsonSerializer.Serialize(collection.GrpcServiceFiles, new JsonSerializerOptions { WriteIndented = true });
+                service_collection.Content = JsonSerializer.Serialize(
+                    collection.GrpcServiceFiles,
+                    typeof(Dictionary<string, GrpcServiceFile>),
+                    TurboLinkJsonContext.Default);
                 response.File.Add(service_collection);
             }
             

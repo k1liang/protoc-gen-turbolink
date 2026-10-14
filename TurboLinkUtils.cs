@@ -121,6 +121,10 @@ namespace protoc_gen_turbolink
                     cppType = "uint32"; break;
                 case FieldDescriptorProto.Types.Type.Bool:
                     cppType = "bool"; break;
+                case FieldDescriptorProto.Types.Type.Enum:
+                    // protobuf enum 的 wire/runtime 表示是 int32；PODConfig 固定头使用同宽度，
+                    // 与 FGrpc 为蓝图暴露而选择的具体枚举底层类型解耦。
+                    cppType = "int32"; break;
             }
             return cppType != null;
         }

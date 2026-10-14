@@ -114,7 +114,16 @@ namespace protoc_gen_turbolink.Template
                 if (v.ToLower() == "false") return;
             }
 
+            // 消息含 deprecated 字段时，其 protobuf accessor 被 [[deprecated]] 标注，直接调用触发 C4996。
+            // 整个转换函数体包一层 #pragma warning(disable:4996) 抑制（仅作用于生成的转换函数）。
+            bool wrapDeprecated = false;
+            foreach (var f in message.Fields)
+            {
+                if (f.HasDeprecatedField) { wrapDeprecated = true; break; }
+            }
+
             // ---------- GRPC_TO_TURBOLINK ----------
+            if (wrapDeprecated) { sb.AppendLine("#pragma warning(push)"); sb.AppendLine("#pragma warning(disable:4996)"); }
             sb.AppendLine($"void GRPC_TO_TURBOLINK(const ::{message.GrpcName}* in, {message.Name}* out)");
             sb.AppendLine("{");
 
@@ -165,7 +174,13 @@ namespace protoc_gen_turbolink.Template
                     }
                     else if (field.FieldDesc.Type == FieldDescriptorProto.Types.Type.Message)
                     {
-                        sb.AppendLine($"        GRPC_TO_TURBOLINK(&(in->{repeatedField.FieldGrpcName}(i)), &(out->{repeatedField.FieldName}.AddZeroed_GetRef()));");
+                        // 必须 AddDefaulted（构造）而不是 AddZeroed（memset 0）：FGrpc 子消息继承
+                        // FTLMessage，**带虚表**。AddZeroed 出来的元素 vptr 为 0，之后任何虚调用
+                        // （IsEqualDefaultValue / CopyToTLMessage / 析构）都会踩空指针。
+                        // 之前一直没炸只是因为嵌套结构走的是上面 NeedNativeMake 分支的
+                        // `new T(field)`——拷贝构造顺手把 vptr 补回来了；只有直接写进
+                        // 非指针成员（如 root_step）的那条路才会把零值元素原样交给调用方。
+                        sb.AppendLine($"        GRPC_TO_TURBOLINK(&(in->{repeatedField.FieldGrpcName}(i)), &(out->{repeatedField.FieldName}.AddDefaulted_GetRef()));");
                     }
                     else
                     {
@@ -237,9 +252,11 @@ namespace protoc_gen_turbolink.Template
             }
 
             sb.AppendLine("}");
+            if (wrapDeprecated) { sb.AppendLine("#pragma warning(pop)"); }
             sb.AppendLine();
 
             // ---------- TURBOLINK_TO_GRPC ----------
+            if (wrapDeprecated) { sb.AppendLine("#pragma warning(push)"); sb.AppendLine("#pragma warning(disable:4996)"); }
             sb.AppendLine($"void TURBOLINK_TO_GRPC(const {message.Name}* in, ::{message.GrpcName}* out)");
             sb.AppendLine("{");
 
@@ -341,6 +358,7 @@ namespace protoc_gen_turbolink.Template
             }
 
             sb.AppendLine("}");
+            if (wrapDeprecated) { sb.AppendLine("#pragma warning(pop)"); }
         }
 
         private string ConvertFieldFromTurboLinkToGrpcLocalValueCheck(GrpcMessageField field, string getField, string tag = CommentTagDefine.FValue, GrpcMessageField fieldWithMeta = null)

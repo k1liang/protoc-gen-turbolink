@@ -11,12 +11,18 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <PublishTrimmed>false</PublishTrimmed>
+    <PublishTrimmed>true</PublishTrimmed>
+    <!-- 构建环境不保证可访问 nuget.org；漏洞审计应由可联网的依赖审计任务执行。 -->
+    <NuGetAudit>false</NuGetAudit>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
     <SelfContained>true</SelfContained>
-    <PublishTrimmed>true</PublishTrimmed>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- Google.Protobuf 已提供 google.protobuf.compiler 的官方生成类型。
+         不再编译仓库里的旧 ProtobufPlugin.cs，避免同名类型 CS0436。 -->
+    <Compile Remove="ProtobufPlugin.cs" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Google.Protobuf" Version="3.24.4" />
     <PackageReference Include="Grpc.Net.Client" Version="2.47.0" />

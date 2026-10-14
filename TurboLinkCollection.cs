@@ -72,6 +72,14 @@ namespace protoc_gen_turbolink
 		}
 		public string FieldDefaultValue { get; set; }   //eg. "=0", '=""', "= static_cast<EGrpcCommonGender>(0)", ""
 		public bool NeedNativeMake { get; set; }
+
+		/// <summary>该字段（含其嵌套子字段）是否为 deprecate 字段。</summary>
+		/// <remarks>deprecate 字段的 protobuf accessor 被 [[deprecated]] 标注，直接调用会触发 C4996。
+		/// 生成的 marshaling 转换函数需要整体包一层 #pragma warning(disable:4996)。</remarks>
+		public virtual bool HasDeprecatedField
+		{
+			get => FieldDesc?.Options?.Deprecated ?? false;
+		}
 	}
 	public class GrpcMessageField_Single : GrpcMessageField
 	{
@@ -112,6 +120,10 @@ namespace protoc_gen_turbolink
 				return NeedNativeMake ? ("TArray<TSharedPtr<" + TurboLinkUtils.GetFieldType(ItemField.FieldDesc, FieldDesc, CommentTagDefine.FArrayValue) + ">>") : FieldType;
 			}
 		}
+		public override bool HasDeprecatedField
+		{
+			get => base.HasDeprecatedField || ItemField.HasDeprecatedField;
+		}
 	}
 	public class GrpcMessageField_Map : GrpcMessageField
 	{
@@ -148,6 +160,10 @@ namespace protoc_gen_turbolink
 					: FieldType;
 			}
 		}
+		public override bool HasDeprecatedField
+		{
+			get => base.HasDeprecatedField || KeyField.HasDeprecatedField || ValueField.HasDeprecatedField;
+		}
 	}
 	public class GrpcMessageField_Oneof : GrpcMessageField
 	{
@@ -171,6 +187,18 @@ namespace protoc_gen_turbolink
 		public override string TypeAsNativeField
 		{
 			get => string.Empty;	//should not be called!
+		}
+		public override bool HasDeprecatedField
+		{
+			get
+			{
+				if (base.HasDeprecatedField) return true;
+				foreach (var f in OneofMessage.Fields)
+				{
+					if (f.HasDeprecatedField) return true;
+				}
+				return false;
+			}
 		}
 	}
 
@@ -437,8 +465,9 @@ namespace protoc_gen_turbolink
 				ParseComments(protoFileName);
 			}
 
-			// step 8: PODConfig is deliberately narrow. Reject unsupported schemas in the
-			// generator instead of emitting a config which only looks trivially copyable.
+			// step 8: validate PODConfig identity/binding. Field shape is intentionally unrestricted:
+			// complex fields are encoded by MessageH as a trivially-copyable header plus deterministic
+			// protobuf payload in the same config block.
 			if (!ValidatePODConfigs(out error))
 			{
 				return false;
@@ -473,23 +502,28 @@ namespace protoc_gen_turbolink
 						return false;
 					}
 
-					foreach (FieldDescriptorProto field in message.MessageDesc.Field)
-					{
-						if (field.Label == FieldDescriptorProto.Types.Label.Repeated ||
-						    field.HasOneofIndex ||
-						    !TurboLinkUtils.TryGetPODFieldType(field, out _))
-						{
-							error = $"PODConfig {configName} field {field.Name} must be a singular numeric/bool scalar";
-							return false;
-						}
-					}
-
-					int oneofReferenceCount = serviceFile.MessageArray
+					var oneofReferences = serviceFile.MessageArray
 						.OfType<GrpcMessage_Oneof>()
-						.Sum(oneof => oneof.Fields.Count(field => field.FieldType == message.Name));
-					if (oneofReferenceCount != 1)
+						.SelectMany(oneof => oneof.Fields
+							.Where(field => field.FieldType == message.Name)
+							.Select(arm => (Oneof: oneof, Arm: arm)))
+						.ToArray();
+					if (oneofReferences.Length == 0)
 					{
-						error = $"PODConfig {configName} must be referenced by exactly one oneof arm in the same proto file";
+						error =
+							$"PODConfig 消息 {message.OriginalDisplayName}（生成 Config：{configName}）" +
+							"没有被同一 proto 文件中的任何外层 oneof arm 引用；" +
+							"TWFlow 无法推导唯一的 ProtoUnionType。";
+						return false;
+					}
+					if (oneofReferences.Length > 1)
+					{
+						string bindings = string.Join(", ", oneofReferences.Select(reference =>
+							$"{reference.Oneof.OriginalDisplayName}.{reference.Arm.FieldDesc.Name}"));
+						error =
+							$"PODConfig 消息 {message.OriginalDisplayName}（生成 Config：{configName}）" +
+							$"被 {oneofReferences.Length} 个外层 oneof arm 引用：{bindings}；" +
+							"当前单值 TTurboLinkPODConfigTraits 只能绑定一个 ProtoUnionType/arm。";
 						return false;
 					}
 				}
